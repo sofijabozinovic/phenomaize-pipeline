@@ -52,3 +52,39 @@ Each script performs one step of the pipeline and produces outputs required by t
 | `group_kfold_predictions.py` | Performs GroupKFold cross-validation for robust prediction of agronomic traits. |
 | `selection_efficiency.py` | Evaluates genotype selection efficiency based on predicted trait values. |
 | `location_validation.py` | Evaluates model transferability between locations using reciprocal validation. |
+---
+
+## Requirements
+
+- Python 3.11 or newer
+- Windows (tested)
+- Required Python packages (to be listed in `requirements.txt`)
+
+---
+
+## Getting started
+
+Clone the repository:
+
+```bash
+git clone https://github.com/sofijabozinovic/phenomaize-pipeline.git
+cd phenomaize-pipeline
+```
+
+Install the required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+Prepare the input data following the example directory structure.
+
+Run the pipeline step by step:
+
+```bash
+python extract.py
+python impute.py
+python group_kfold_predictions.py
+python selection_efficiency.py
+python location_validation.py
+```
