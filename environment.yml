@@ -1,0 +1,30 @@
+name: phenomaize
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python>=3.11,<3.13
+
+  - numpy
+  - pandas
+  - scipy
+
+  - scikit-learn
+  - xgboost
+
+  - matplotlib
+  - seaborn
+
+  - rasterio
+  - geopandas
+  - shapely
+
+  - tqdm
+
+  - pip
+
+  - pip:
+      - torch
+      - tabulate
