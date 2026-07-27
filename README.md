@@ -1,4 +1,4 @@
-# PhenoMaize Pipeline
+# PHENO_MaizE Pipeline
 
 Machine-learning framework for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
 
@@ -26,7 +26,7 @@ The prediction modules are fully configurable through command-line options, allo
 
 without modifying the source code.
 
-The current version supports prediction of:
+The current version supports prediction of the following traits:
 
 - grain yield
 - grain moisture
@@ -89,7 +89,7 @@ The pipeline has been tested on:
 
 The software has been tested using Conda environments on both operating systems.
 
-Required packages will be provided in the accompanying environment file.
+All required dependencies are provided in the accompanying environment.yml file.
 
 ---
 
@@ -102,7 +102,11 @@ git clone https://github.com/sofijabozinovic/phenomaize-pipeline.git
 cd phenomaize-pipeline
 ```
 
-Create the Python environment (instructions will be provided in the environment file), then activate it.
+Create and activate the Conda environment:
+
+```bash
+conda env create -f environment.yml
+conda activate phenomaize
 
 The repository includes an example dataset that allows users to reproduce the complete workflow.
 
@@ -215,18 +219,26 @@ All output files are written to user-specified output directories.
 
 ## Reproducibility
 
-All example commands provided in this README have been tested using the example dataset on both Windows and Ubuntu.
+All example commands provided in this README have been tested using the example dataset and the accompanying `environment.yml` file on both Windows and Ubuntu.
+
+---
+
+## Acknowledgements
+
+This software was developed within the **PHENO_MaizE** project.
+
+The project is supported by the **Science Fund of the Republic of Serbia** (Grant No. **6672**), *High-throughput field phenotyping in temperate maize hybrid breeding: how can phenomics improve speed and accuracy of selection?*
 
 ---
 
 ## Citation
 
-If you use this pipeline in your research, please cite the associated publication (to be added) and acknowledge the PHENO_MaizE project.
+If you use this software in your research, please cite it using the metadata provided in the `CITATION.cff` file or the GitHub **Cite this repository** option.
 
 ---
 
 ## License
 
-License information will be added upon the first public release.
+License information will be added after institutional approval.
 
 
