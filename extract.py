@@ -547,13 +547,12 @@ def main():
     )
 
     flight_info_df["date"] = pd.to_datetime(
-        flight_info_df["date"],
-        format="%d.%m.%y.",
+        flight_info_df["date"].astype(str).str.rstrip("."),
+        format="%d.%m.%y",
         errors="coerce"
     )
 
     flight_info_df = flight_info_df.dropna(subset=["date"])
-
     flight_info_df = flight_info_df.sort_values(
         by=["location", "trial", "date"]
     ).reset_index(drop=True)
