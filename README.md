@@ -1,4 +1,4 @@
-# PhenoMaize Pipeline
+# Phenomaize Pipeline
 
 Machine learning pipeline for UAV-based high-throughput phenotyping in maize using UAV-derived vegetation indices.
 Developed within the PHENO_MaizE project.
