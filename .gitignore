@@ -11,6 +11,10 @@ __pycache__/
 venv/
 env/
 
+# Conda environments
+.conda/
+conda-meta/
+
 # Python packaging
 build/
 dist/
@@ -65,10 +69,3 @@ example_data/orthomosaics/
 *.npy
 *.npz
 
-# ============================================================================
-# Optional generated figures
-# ============================================================================
-
-*.png
-*.jpg
-*.jpeg
