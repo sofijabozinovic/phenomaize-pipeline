@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+
+title: "PHENO_MaizE Pipeline: A machine-learning framework for UAV-based high-throughput phenotyping in maize"
+
+type: software
+
+authors:
+  - family-names: "Božinović"
+    given-names: "Sofija"
+    orcid: "https://orcid.org/0000-0002-1966-1656"
+    affiliation: "Maize Research Institute Zemun Polje, Serbia"
+
+  - family-names: "Galić"
+    given-names: "Vlatko"
+    orcid: "https://orcid.org/0000-0002-5191-2953"
+    affiliation: "Agricultural Institute Osijek, Croatia"
+
+repository-code: "https://github.com/sofijabozinovic/phenomaize-pipeline"
+
+url: "https://github.com/sofijabozinovic/phenomaize-pipeline"
+
+license: "MIT"
+
+version: "1.0.0"
+
+keywords:
+  - maize
+  - UAV
+  - high-throughput phenotyping
+  - machine learning
+  - remote sensing
+  - vegetation indices
+  - crop phenotyping

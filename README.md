@@ -6,7 +6,7 @@ Designed for reproducible extraction, prediction, and evaluation of agronomic tr
 
 Developed within the **PHENO_MaizE** project.
 
-> 🚧 **Status:** Under active development.
+> 🚧 **Status:** > 🚀 Stable release: v1.0.0
 
 ---
 
@@ -107,8 +107,13 @@ Create and activate the Conda environment:
 ```bash
 conda env create -f environment.yml
 conda activate phenomaize
+``` 
 
-The repository includes an example dataset that allows users to reproduce the complete workflow.
+The complete example dataset is distributed separately through Zenodo because UAV orthomosaics exceed GitHub's recommended file-size limits.
+
+The dataset includes both the raw files required to reproduce the complete workflow and processed example tables for testing the prediction modules.
+
+The Zenodo DOI will be added after the first public release.
 
 Run the preprocessing steps:
 
@@ -188,16 +193,20 @@ or replace `ml.py` with the desired prediction script.
 
 ## Example dataset
 
-The repository includes a small example dataset that allows users to test the complete pipeline without preparing their own data.
+The complete example dataset is distributed separately through Zenodo.
 
-The example dataset includes:
+It includes:
 
 - UAV orthomosaics
-- experimental plot polygons
+- experimental plot shapefiles
 - field measurements
 - flight metadata
+- extracted vegetation-index tables
+- imputed datasets
 
-All scripts in this repository have been tested using this dataset on both Windows and Ubuntu.
+The raw files enable reproduction of the complete workflow from UAV imagery, while the processed datasets allow rapid testing of the prediction modules.
+
+The Zenodo DOI will be added after the first public release.
 
 ---
 
@@ -219,7 +228,7 @@ All output files are written to user-specified output directories.
 
 ## Reproducibility
 
-All example commands provided in this README have been tested using the example dataset and the accompanying `environment.yml` file on both Windows and Ubuntu.
+All example commands provided in this README have been tested using the complete example dataset and the accompanying `environment.yml` file on both Windows and Ubuntu.
 
 ---
 
@@ -239,6 +248,6 @@ If you use this software in your research, please cite it using the metadata pro
 
 ## License
 
-License information will be added after institutional approval.
+This project is distributed under the MIT License. See the `LICENSE` file for details.
 
 
