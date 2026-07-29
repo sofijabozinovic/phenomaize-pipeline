@@ -2,11 +2,11 @@
 
 Machine-learning framework for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
 
-Designed for reproducible extraction, prediction, and evaluation of agronomic traits from UAV imagery.
+The pipeline provides a reproducible workflow for vegetation-index extraction, machine-learning prediction, and agronomic trait evaluation from UAV imagery.
 
 Developed within the **PHENO_MaizE** project.
 
-> 🚧 **Status:** > 🚀 Stable release: v1.0.0
+> 🚀 **Status:** Stable release: **v1.0.0**
 
 ---
 
@@ -113,7 +113,9 @@ The complete example dataset is distributed separately through Zenodo because UA
 
 The dataset includes both the raw files required to reproduce the complete workflow and processed example tables for testing the prediction modules.
 
-The Zenodo DOI will be added after the first public release.
+The complete example dataset is available on Zenodo:
+
+**https://doi.org/10.5281/zenodo.21676750**
 
 Run the preprocessing steps:
 
@@ -206,7 +208,9 @@ It includes:
 
 The raw files enable reproduction of the complete workflow from UAV imagery, while the processed datasets allow rapid testing of the prediction modules.
 
-The Zenodo DOI will be added after the first public release.
+Dataset DOI:
+
+**https://doi.org/10.5281/zenodo.21676750**
 
 ---
 
@@ -242,7 +246,15 @@ The project is supported by the **Science Fund of the Republic of Serbia** (Gran
 
 ## Citation
 
-If you use this software in your research, please cite it using the metadata provided in the `CITATION.cff` file or the GitHub **Cite this repository** option.
+If you use PHENO_MaizE Pipeline in your research, please cite both the software and the accompanying dataset.
+
+**Software (v1.0.0)**  
+https://doi.org/10.5281/zenodo.21681518
+
+**Example dataset**  
+https://doi.org/10.5281/zenodo.21676750
+
+Citation metadata are also available in the `CITATION.cff` file and through GitHub's **Cite this repository** feature.
 
 ---
 

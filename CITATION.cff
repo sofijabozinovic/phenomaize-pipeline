@@ -20,9 +20,13 @@ repository-code: "https://github.com/sofijabozinovic/phenomaize-pipeline"
 
 url: "https://github.com/sofijabozinovic/phenomaize-pipeline"
 
+doi: "10.5281/zenodo.21681518"
+
 license: "MIT"
 
 version: "1.0.0"
+
+date-released: "2026-07-29"
 
 keywords:
   - maize
