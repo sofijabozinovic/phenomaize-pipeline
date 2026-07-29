@@ -109,13 +109,13 @@ conda env create -f environment.yml
 conda activate phenomaize
 ``` 
 
-The complete example dataset is distributed separately through Zenodo because UAV orthomosaics exceed GitHub's recommended file-size limits.
-
-The dataset includes both the raw files required to reproduce the complete workflow and processed example tables for testing the prediction modules.
-
 The complete example dataset is available on Zenodo:
 
 **https://doi.org/10.5281/zenodo.21676750**
+
+The dataset includes both the raw files required to reproduce the complete workflow (including UAV orthomosaics) and processed example tables for testing the prediction modules.
+
+Download and extract the dataset before running the preprocessing or prediction examples below.
 
 Run the preprocessing steps:
 
@@ -137,7 +137,7 @@ The following examples illustrate the most common analyses.
 
 ```bash
 python ml.py \
-    --input example_data/results/vi_results_wide_imputed_mice_global.csv \
+    --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield
 ```
 
@@ -145,7 +145,7 @@ python ml.py \
 
 ```bash
 python group_kfold_predictions.py \
-    --input example_data/results/vi_results_wide_imputed_mice_global.csv \
+    --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield \
     --group-col genotype
 ```
@@ -154,14 +154,14 @@ python group_kfold_predictions.py \
 
 ```bash
 python selection_efficiency.py \
-    --predictions example_data/results/groupkfold_yield/predictions.csv
+    --predictions path/to/dataset/results/groupkfold_yield/predictions.csv 
 ```
 
 ### Reciprocal location validation
 
 ```bash
 python location_validation.py \
-    --input example_data/results/vi_results_wide_imputed_mice_global.csv \
+    --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield
 ```
 ---
@@ -195,7 +195,7 @@ or replace `ml.py` with the desired prediction script.
 
 ## Example dataset
 
-The complete example dataset is distributed separately through Zenodo.
+The complete example dataset is available on Zenodo.
 
 It includes:
 
@@ -246,7 +246,7 @@ The project is supported by the **Science Fund of the Republic of Serbia** (Gran
 
 ## Citation
 
-If you use PHENO_MaizE Pipeline in your research, please cite both the software and the accompanying dataset.
+If you use PHENO_MaizE Pipeline in your research, please cite the software. If you use the accompanying example dataset, please cite the dataset as well.
 
 **Software (v1.0.0)**  
 https://doi.org/10.5281/zenodo.21681518
