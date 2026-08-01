@@ -1,22 +1,31 @@
 # PHENO_MaizE Pipeline
 
-Machine-learning framework for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
+An open-source, modular pipeline for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
 
-The pipeline provides a reproducible workflow for vegetation-index extraction, machine-learning prediction, and agronomic trait evaluation from UAV imagery.
+The pipeline provides a reproducible workflow for vegetation-index extraction, missing-value imputation, machine-learning prediction, validation, and genotype-selection analyses.
 
-Developed within the **PHENO_MaizE** project.
+The software supports both:
 
-> 🚀 **Status:** Stable release: **v1.0.0**
+- a unified command-line workflow through **`run_pipeline.py`**
+- standalone execution of individual analysis modules for advanced users
 
+Developed within the **PHENO_MaizE** project (Grant No 6672, Science Fund of the Republic of Serbia).
+
+> 🚀 **Status:** Stable release: **v1.1.0**
 ---
 
 ## Overview
 
-PhenoMaize Pipeline is an open-source machine-learning framework for UAV-based high-throughput phenotyping in maize.
+PHENO_MaizE Pipeline is an open-source software package for reproducible UAV-based high-throughput phenotyping in maize.
 
-The framework extracts vegetation indices from UAV orthomosaics and provides a reproducible workflow for evaluating their ability to predict agronomic traits.
+The pipeline extracts vegetation indices from UAV orthomosaics, imputes missing feature values, and provides a unified framework for predicting agronomic traits using multiple machine-learning algorithms and validation strategies.
 
-The prediction modules are fully configurable through command-line options, allowing users to compare different:
+The software can be used in two complementary ways:
+
+- **Unified workflow** through `run_pipeline.py`, which orchestrates the complete analysis pipeline from preprocessing to model evaluation.
+- **Standalone modules**, allowing individual scripts to be executed independently for customized workflows or integration into existing analysis pipelines.
+
+The prediction framework is fully configurable through command-line options, enabling systematic comparison of:
 
 - vegetation indices
 - plot mask types
@@ -36,46 +45,79 @@ The current version supports prediction of the following traits:
 
 ## Key features
 
+- Unified command-line interface through `run_pipeline.py` for executing complete or partial workflows.
+- Modular architecture allowing standalone execution of all pipeline components.
 - End-to-end workflow from UAV orthomosaics to agronomic trait prediction.
-- Flexible command-line interface for reproducible analyses.
-- Configurable selection of vegetation indices, plot mask types, growth stages, and feature statistics.
+- Flexible preprocessing including vegetation-index extraction and missing-value imputation.
+- Configurable feature selection based on vegetation indices, plot mask types, growth stages, and feature statistics.
 - Support for multiple machine-learning algorithms (Lasso, Ridge, Random Forest, XGBoost, CNN).
 - Multiple validation strategies, including repeated cross-validation, GroupKFold by genotype, and reciprocal location validation.
 - Genotype selection-efficiency analysis based on GroupKFold predictions.
+- Reproducible analyses through a consistent command-line interface.
 
 ---
 
 ## Workflow
 
+The recommended way to use PHENO_MaizE Pipeline is through the unified command-line interface provided by `run_pipeline.py`.
+
 ```text
-extract.py
-      ↓
-impute.py
-      ↓
-prediction modules
-      ↓
-analysis outputs
+                           run_pipeline.py
+                                  │
+          ┌───────────────────────┼────────────────────────┐
+          │                       │                        │
+          ▼                       ▼                        ▼
+   preprocess               analysis                  full workflow
+          │                       │
+          ▼                       ▼
+   ┌──────────────┐      ┌──────────────────────────────────────────┐
+   │ extract.py   │      │ ml.py                                    │
+   └──────┬───────┘      │ group_kfold_predictions.py               │
+          ▼              │ location_validation.py                   │
+   ┌──────────────┐      │ selection_efficiency.py                  │
+   │ impute.py    │      └──────────────────────────────────────────┘
+   └──────────────┘
 ```
 
-After feature extraction and imputation, the resulting dataset can be analyzed using one or more prediction modules:
+The pipeline can be executed at different levels depending on the desired workflow:
 
-- standard machine-learning evaluation (`ml.py`)
-- GroupKFold validation (`group_kfold_predictions.py`)
-- reciprocal location validation (`location_validation.py`)
-- genotype selection-efficiency analysis (`selection_efficiency.py`, based on GroupKFold predictions)
+- **`preprocess`** – performs vegetation-index extraction followed by missing-value imputation.
+- **`analysis`** – executes one or more prediction and validation modules using an imputed dataset.
+- **`full`** – runs the complete workflow from UAV-derived vegetation-index extraction to agronomic trait prediction and evaluation.
+
+For advanced users, every module can also be executed independently.
 
 ---
 
-## Pipeline components
+## Pipeline Components
+
+PHENO_MaizE Pipeline consists of a unified workflow interface together with modular analysis scripts that can be executed independently.
+
+### Unified workflow
+
+| Component | Description |
+|-----------|-------------|
+| `run_pipeline.py` | Main command-line interface that orchestrates complete or partial PHENO_MaizE workflows. Supports preprocessing, prediction, validation, and full end-to-end analyses through a single entry point. |
+
+---
+
+### Preprocessing modules
 
 | Script | Description |
-|----------|-------------|
-| `extract.py` | Extracts plot-level vegetation indices from UAV orthomosaics using plot polygons. |
-| `impute.py` | Imputes missing feature values using multiple statistical methods. |
-| `ml.py` | Trains and compares machine-learning models using configurable feature subsets. |
-| `group_kfold_predictions.py` | Evaluates prediction performance using GroupKFold validation while keeping complete genotype groups together. |
-| `selection_efficiency.py` | Quantifies genotype-selection efficiency from GroupKFold predictions. |
-| `location_validation.py` | Evaluates model transferability between experimental locations. |
+|--------|-------------|
+| `extract.py` | Extracts vegetation indices and canopy cover from UAV orthomosaics and generates long- and wide-format feature tables. |
+| `impute.py` | Performs missing-value imputation using MICE or KNN and generates imputed datasets for downstream analyses. |
+
+---
+
+### Prediction and validation modules
+
+| Script | Description |
+|--------|-------------|
+| `ml.py` | Standard machine-learning prediction using repeated random train/test splits. |
+| `group_kfold_predictions.py` | Machine-learning prediction using GroupKFold cross-validation to evaluate prediction of previously unseen genotypes. |
+| `location_validation.py` | Reciprocal location validation by training models on one location and testing on another. |
+| `selection_efficiency.py` | Evaluates genotype-selection efficiency based on GroupKFold prediction results. |
 
 ---
 
@@ -91,9 +133,11 @@ The software has been tested using Conda environments on both operating systems.
 
 All required dependencies are provided in the accompanying environment.yml file.
 
+After installing all dependencies, the complete workflow can be executed through the unified command-line interface (`run_pipeline.py`) or by running individual modules independently.
+
 ---
 
-## Getting started
+## Getting Started
 
 Clone the repository:
 
@@ -107,7 +151,15 @@ Create and activate the Conda environment:
 ```bash
 conda env create -f environment.yml
 conda activate phenomaize
-``` 
+```
+
+Verify that the installation was successful:
+
+```bash
+python run_pipeline.py --help
+```
+
+This command displays all available workflow modules and analysis options.
 
 The complete example dataset is available on Zenodo:
 
@@ -115,23 +167,66 @@ The complete example dataset is available on Zenodo:
 
 The dataset includes both the raw files required to reproduce the complete workflow (including UAV orthomosaics) and processed example tables for testing the prediction modules.
 
-Download and extract the dataset before running the preprocessing or prediction examples below.
-
-Run the preprocessing steps:
-
-```bash
-python extract.py
-python impute.py
-```
-
-The resulting imputed dataset can then be used with one or more prediction modules, depending on the desired analysis.
+Download and extract the dataset before running the examples below.
 
 ---
 
-## Running prediction modules
+## Quick Start
 
-After preprocessing, the imputed dataset can be analyzed using one or more prediction modules. 
-The following examples illustrate the most common analyses.
+The recommended way to use PHENO_MaizE Pipeline is through the unified command-line interface provided by `run_pipeline.py`.
+
+### Run the complete workflow
+
+```bash
+python run_pipeline.py full --target yield
+```
+
+This command automatically performs:
+
+1. vegetation-index extraction
+2. missing-value imputation
+3. machine-learning prediction
+4. GroupKFold validation
+5. reciprocal location validation
+6. selection-efficiency analysis
+
+### Run preprocessing only
+
+```bash
+python run_pipeline.py preprocess
+```
+
+### Run prediction and validation modules
+
+```bash
+python run_pipeline.py analysis --target yield
+```
+
+### Run a single analysis module
+
+```bash
+python run_pipeline.py analysis \
+    --target yield \
+    --analyses group-kfold
+```
+
+### Preview workflow commands
+
+```bash
+python run_pipeline.py full --target yield --dry-run
+```
+
+### Re-run completed steps
+
+```bash
+python run_pipeline.py full --target yield --force
+```
+
+## Advanced Usage: Standalone Modules
+
+The unified workflow (`run_pipeline.py`) is recommended for most users.
+
+The standalone scripts described below remain available for customized workflows, development, and advanced analyses.
 
 ### Standard machine-learning evaluation
 
@@ -166,73 +261,102 @@ python location_validation.py \
 ```
 ---
 
-## Customizing analyses
+## Customizing Analyses
 
-The prediction scripts share a common command-line interface, allowing analyses to be customized without modifying the source code.
+All prediction modules share a common command-line interface, allowing analyses to be customized without modifying the source code.
+
+The unified workflow (`run_pipeline.py`) forwards these options to the corresponding analysis modules, providing the same flexibility through a single entry point.
 
 Common configuration options include:
 
-- machine-learning model
+- machine-learning algorithm
 - vegetation indices
 - plot mask type
 - growth stages
 - vegetation-index statistics
 - canopy cover inclusion
 
-These options can be combined, allowing users to systematically compare different feature subsets and analysis settings.
+These options can be freely combined, allowing systematic comparison of different feature subsets and analysis settings.
 
-Most prediction scripts also support custom feature filtering using regular expressions.
+Most prediction modules also support custom feature filtering using regular expressions.
 
-To display all available options for a script, use:
+To display all available options for a specific module, use:
 
 ```bash
 python ml.py --help
 ```
 
-or replace `ml.py` with the desired prediction script.
+or replace `ml.py` with any other standalone analysis module.
 
+To display all available options for the unified workflow, use:
+
+```bash
+python run_pipeline.py analysis --help
+```
 ---
 
-## Example dataset
+## Example Dataset
 
-The complete example dataset is available on Zenodo.
-
-It includes:
-
-- UAV orthomosaics
-- experimental plot shapefiles
-- field measurements
-- flight metadata
-- extracted vegetation-index tables
-- imputed datasets
-
-The raw files enable reproduction of the complete workflow from UAV imagery, while the processed datasets allow rapid testing of the prediction modules.
-
-Dataset DOI:
+An example dataset is publicly available on Zenodo:
 
 **https://doi.org/10.5281/zenodo.21676750**
 
+The dataset enables users to reproduce the complete PHENO_MaizE workflow and explore the PHENO_MaizE Pipeline without requiring access to proprietary breeding data.
+
+The archive contains:
+
+- UAV orthomosaics for all flights
+- flight metadata
+- field metadata
+- processed vegetation-index tables
+- example datasets for machine-learning analyses
+
+The example dataset can be used with:
+
+- `run_pipeline.py` for executing the complete workflow
+- individual standalone modules for customized analyses
+
+The dataset is intended for demonstration, testing, and reproducibility of the PHENO_MaizE Pipeline.
+
 ---
 
-## Output files
+## Output Files
 
-Depending on the selected workflow, the pipeline generates:
+Depending on the selected workflow, PHENO_MaizE Pipeline automatically organizes results into dedicated output directories.
 
-- extracted vegetation indices
+Typical outputs include:
+
+- extracted vegetation-index tables
 - imputed datasets
 - trained machine-learning models
+- prediction summaries
 - prediction tables
-- feature importance tables
-- genotype selection-efficiency summaries
+- feature-importance tables
 - reciprocal location-validation results
+- genotype selection-efficiency analyses
+- automatically generated reports for each analysis module
 
-All output files are written to user-specified output directories.
+The default output structure is:
+
+```text
+results/
+├── extracted/
+├── imputed/
+├── ml/
+├── group_kfold/
+├── location_validation/
+└── selection_efficiency/
+```
+
+Custom output locations can be specified through the command-line interface.
 
 ---
 
 ## Reproducibility
 
-All example commands provided in this README have been tested using the complete example dataset and the accompanying `environment.yml` file on both Windows and Ubuntu.
+All example commands provided in this README have been tested using the complete example dataset together with the accompanying `environment.yml` file on both Windows and Ubuntu.
+
+The unified workflow and all standalone analysis modules produce reproducible results when executed with the same input data and software environment.
 
 ---
 
@@ -246,15 +370,17 @@ The project is supported by the **Science Fund of the Republic of Serbia** (Gran
 
 ## Citation
 
-If you use PHENO_MaizE Pipeline in your research, please cite the software. If you use the accompanying example dataset, please cite the dataset as well.
+If you use PHENO_MaizE Pipeline in your research, please cite both the software and, when applicable, the accompanying example dataset.
 
-**Software (v1.0.0)**  
-https://doi.org/10.5281/zenodo.21681518
+**Software (v1.1.0)**
 
-**Example dataset**  
+DOI will be available after the v1.1.0 release.
+
+**Example dataset**
+
 https://doi.org/10.5281/zenodo.21676750
 
-Citation metadata are also available in the `CITATION.cff` file and through GitHub's **Cite this repository** feature.
+Citation metadata are provided through the `CITATION.cff` file and GitHub's **Cite this repository** feature.
 
 ---
 
@@ -262,4 +388,7 @@ Citation metadata are also available in the `CITATION.cff` file and through GitH
 
 This project is distributed under the MIT License. See the `LICENSE` file for details.
 
+---
+
+PHENO_MaizE Pipeline is actively developed within the PHENO_MaizE project. Contributions, suggestions, and bug reports are welcome through GitHub Issues.
 

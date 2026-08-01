@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
 
-title: "PHENO_MaizE Pipeline: A machine-learning framework for UAV-based high-throughput phenotyping in maize"
+title: "PHENO_MaizE Pipeline: An open-source pipeline for UAV-based high-throughput phenotyping in maize"
 
 type: software
 
@@ -24,9 +24,9 @@ doi: "10.5281/zenodo.21681518"
 
 license: "MIT"
 
-version: "1.0.0"
+version: "1.1.0"
 
-date-released: "2026-07-29"
+date-released: "2026-08-01"
 
 keywords:
   - maize
@@ -36,3 +36,5 @@ keywords:
   - remote sensing
   - vegetation indices
   - crop phenotyping
+  - pipeline
+  - phenomics
