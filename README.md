@@ -1,6 +1,6 @@
 # PHENO_MaizE Pipeline
 
-An open-source, modular pipeline for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
+An open-source modular pipeline for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
 
 The pipeline provides a reproducible workflow for vegetation-index extraction, missing-value imputation, machine-learning prediction, validation, and genotype-selection analyses.
 
@@ -156,7 +156,7 @@ conda activate phenomaize
 Verify that the installation was successful:
 
 ```bash
-python run_pipeline.py --help
+python src/run_pipeline.py --help
 ```
 
 This command displays all available workflow modules and analysis options.
@@ -167,7 +167,7 @@ The complete example dataset is available on Zenodo:
 
 The dataset includes both the raw files required to reproduce the complete workflow (including UAV orthomosaics) and processed example tables for testing the prediction modules.
 
-Download and extract the dataset before running the examples below.
+Download and extract the dataset before running the examples below preserving the original directory structure.
 
 ---
 
@@ -178,7 +178,7 @@ The recommended way to use PHENO_MaizE Pipeline is through the unified command-l
 ### Run the complete workflow
 
 ```bash
-python run_pipeline.py full --target yield
+python src/run_pipeline.py full --target yield
 ```
 
 This command automatically performs:
@@ -193,19 +193,19 @@ This command automatically performs:
 ### Run preprocessing only
 
 ```bash
-python run_pipeline.py preprocess
+python src/run_pipeline.py preprocess
 ```
 
 ### Run prediction and validation modules
 
 ```bash
-python run_pipeline.py analysis --target yield
+python src/run_pipeline.py analysis --target yield
 ```
 
 ### Run a single analysis module
 
 ```bash
-python run_pipeline.py analysis \
+python src/run_pipeline.py analysis \
     --target yield \
     --analyses group-kfold
 ```
@@ -213,13 +213,13 @@ python run_pipeline.py analysis \
 ### Preview workflow commands
 
 ```bash
-python run_pipeline.py full --target yield --dry-run
+python src/run_pipeline.py full --target yield --dry-run
 ```
 
 ### Re-run completed steps
 
 ```bash
-python run_pipeline.py full --target yield --force
+python src/run_pipeline.py full --target yield --force
 ```
 
 ## Advanced Usage: Standalone Modules
@@ -231,7 +231,7 @@ The standalone scripts described below remain available for customized workflows
 ### Standard machine-learning evaluation
 
 ```bash
-python ml.py \
+python src/ml.py \
     --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield
 ```
@@ -239,7 +239,7 @@ python ml.py \
 ### GroupKFold validation
 
 ```bash
-python group_kfold_predictions.py \
+python src/group_kfold_predictions.py \
     --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield \
     --group-col genotype
@@ -248,14 +248,14 @@ python group_kfold_predictions.py \
 ### Selection-efficiency analysis
 
 ```bash
-python selection_efficiency.py \
+python src/selection_efficiency.py \
     --predictions path/to/dataset/results/groupkfold_yield/predictions.csv 
 ```
 
 ### Reciprocal location validation
 
 ```bash
-python location_validation.py \
+python src/location_validation.py \
     --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield
 ```
@@ -283,7 +283,7 @@ Most prediction modules also support custom feature filtering using regular expr
 To display all available options for a specific module, use:
 
 ```bash
-python ml.py --help
+python src/ml.py --help
 ```
 
 or replace `ml.py` with any other standalone analysis module.
@@ -291,7 +291,7 @@ or replace `ml.py` with any other standalone analysis module.
 To display all available options for the unified workflow, use:
 
 ```bash
-python run_pipeline.py analysis --help
+python src/run_pipeline.py analysis --help
 ```
 ---
 

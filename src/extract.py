@@ -436,9 +436,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
         Examples:
-          python extract.py
+          python src/extract.py
 
-          python extract.py --data-dir /path/to/my_dataset
+          python src/extract.py --data-dir /path/to/my_dataset
         """
     )
 

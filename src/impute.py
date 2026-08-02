@@ -326,13 +326,13 @@ def main():
         epilog="""
 Example usage:
   # Single pass with MICE
-  python impute.py --input results.csv --method MICE
+  python src/impute.py --input results.csv --method MICE
 
   # Two-pass grouped imputation
-  python impute.py --input results.csv --method MICE --group-by trial fao
+  python src/impute.py --input results.csv --method MICE --group-by trial fao
 
   # KNN imputation
-  python impute.py --input results.csv --method KNN --neighbors 5
+  python src/impute.py --input results.csv --method KNN --neighbors 5
         """
     )
 
