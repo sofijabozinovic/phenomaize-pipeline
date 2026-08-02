@@ -374,7 +374,7 @@ If you use PHENO_MaizE Pipeline in your research, please cite both the software 
 
 **Software release v1.2.0**
 
-The version-specific DOI will be added after Zenodo archives this release.
+https://doi.org/10.5281/zenodo.21760531
 
 **Example dataset**
 
