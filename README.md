@@ -1,6 +1,6 @@
 # PHENO_MaizE Pipeline
 
-An open-source modular pipeline for UAV-based high-throughput phenotyping in maize using vegetation indices extracted from UAV orthomosaics.
+An open-source modular pipeline for UAV-based high-throughput phenotyping in maize using RGB-derived vegetation indices from UAV orthomosaics.
 
 The pipeline provides a reproducible workflow for vegetation-index extraction, missing-value imputation, machine-learning prediction, validation, and genotype-selection analyses.
 
@@ -18,7 +18,7 @@ Developed within the **PHENO_MaizE** project (Grant No 6672, Science Fund of the
 
 PHENO_MaizE Pipeline is an open-source software package for reproducible UAV-based high-throughput phenotyping in maize.
 
-The pipeline extracts vegetation indices from UAV orthomosaics, imputes missing feature values, and provides a unified framework for predicting agronomic traits using multiple machine-learning algorithms and validation strategies.
+The pipeline extracts RGB-derived vegetation indices from UAV orthomosaics, imputes missing feature values, and provides a unified framework for predicting agronomic traits using multiple machine-learning algorithms and validation strategies.
 
 The software can be used in two complementary ways:
 
