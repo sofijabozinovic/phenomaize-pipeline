@@ -308,6 +308,7 @@ The archive contains:
 - UAV orthomosaics for all flights
 - flight metadata
 - field metadata
+- Experimental plot boundary shapefiles
 - processed vegetation-index tables
 - example datasets for machine-learning analyses
 
