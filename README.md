@@ -165,7 +165,7 @@ The complete example dataset is available on Zenodo:
 
 **https://doi.org/10.5281/zenodo.21676750**
 
-The example dataset includes four representative UAV RGB orthomosaics (two acquisition dates per location), together with the corresponding plot boundary shapefiles, field data, and flight metadata for testing the feature extraction and preprocessing workflow. In addition, the dataset provides precomputed phenotypic features extracted from all 36 orthomosaics acquired across both locations, allowing users to run the machine-learning prediction and validation modules without processing the complete image collection.
+The example dataset includes four representative UAV RGB orthomosaics with corresponding input files, along with precomputed phenotypic features extracted from all 36 orthomosaics across two locations for testing the prediction and validation modules.
 
 Download and extract the dataset before running the examples below preserving the original directory structure.
 
@@ -301,22 +301,19 @@ An example dataset is publicly available on Zenodo:
 
 **https://doi.org/10.5281/zenodo.21676750**
 
-The dataset is designed to demonstrate the PHENO_MaizE Pipeline using data from maize inbred line trials (TOL) conducted at two experimental locations. It provides representative raw input files for testing feature extraction and preprocessing, together with precomputed datasets for running machine-learning prediction, validation, and genotype selection-efficiency analyses.
+The example dataset provides raw input files and preprocessed data for testing the PHENO_MaizE Pipeline.
 
 The archive contains:
+- Four representative UAV RGB orthomosaics (two per location).
+- Corresponding plot boundary shapefiles, field data, and flight metadata.
+- Extracted vegetation indices and canopy cover from 36 orthomosaics acquired for the same trial at two locations.
+- Preprocessed datasets for machine-learning analyses.
 
-- Four representative UAV RGB orthomosaics (two acquisition dates per location).
-- Flight metadata for the TOL trials at both locations.
-- Field data for the TOL trials at both locations.
-- Experimental plot boundary shapefiles for both locations.
-- Extracted vegetation-index and canopy-cover data from all 36 UAV orthomosaics (17 at SD and 19 at SP).
-- Preprocessed datasets suitable for machine-learning analyses.
-
-The four orthomosaics enable users to test the image-processing workflow, while the precomputed feature datasets allow prediction and validation analyses to be performed using the complete multitemporal feature collection without requiring access to all 36 original orthomosaics.
+The provided orthomosaics can be used to test feature extraction, while the precomputed datasets enable prediction, validation, and genotype selection-efficiency analyses without processing the complete image collection.
 
 The example dataset can be used with:
 
-- `run_pipeline.py` for executing the complete workflow
+- `run_pipeline.py` for testing preprocessing on the provided orthomosaics and running prediction and validation analyses using the precomputed datasets.
 - individual standalone modules for customized analyses
 
 The dataset is intended for demonstration, testing, and reproducibility of the PHENO_MaizE Pipeline.
