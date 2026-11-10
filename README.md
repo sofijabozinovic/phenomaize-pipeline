@@ -167,7 +167,7 @@ The complete example dataset is available on Zenodo:
 
 The example dataset includes four representative UAV RGB orthomosaics with corresponding input files, along with precomputed phenotypic features extracted from all 36 orthomosaics across two locations for testing the prediction and validation modules.
 
-Download and extract the dataset before running the examples below preserving the original directory structure.
+Download and extract the dataset before running the examples below, preserving the original directory structure.
 
 ---
 
@@ -189,6 +189,8 @@ This command automatically performs:
 4. GroupKFold validation
 5. reciprocal location validation
 6. selection-efficiency analysis
+
+Note: The example dataset contains four orthomosaics for testing feature extraction. To run prediction and validation analyses using features from all 36 acquisitions, use the provided preprocessed datasets with the analysis workflow.
 
 ### Run preprocessing only
 
@@ -354,7 +356,7 @@ Custom output locations can be specified through the command-line interface.
 
 ## Reproducibility
 
-All example commands provided in this README have been tested using the complete example dataset together with the accompanying `environment.yml` file on both Windows and Ubuntu.
+The example workflows have been tested using the provided raw and preprocessed datasets, together with the accompanying environment.yml file, on Windows and Ubuntu.
 
 The unified workflow and all standalone analysis modules produce reproducible results when executed with the same input data and software environment.
 
