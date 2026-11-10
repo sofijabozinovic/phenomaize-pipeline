@@ -12,6 +12,7 @@ The software supports both:
 Developed within the **PHENO_MaizE** project (Grant No 6672, Science Fund of the Republic of Serbia).
 
 > 🚀 **Status:** Stable release: **v1.2.0**
+
 ---
 
 ## Overview
@@ -175,6 +176,8 @@ Download and extract the dataset before running the examples below, preserving t
 
 The recommended way to use PHENO_MaizE Pipeline is through the unified command-line interface provided by `run_pipeline.py`.
 
+The following commands assume that the downloaded example dataset has been organized in the `example_data/` directory. Use `--data-dir` to specify a different location.
+
 ### Run the complete workflow
 
 ```bash
@@ -190,7 +193,7 @@ This command automatically performs:
 5. reciprocal location validation
 6. selection-efficiency analysis
 
-Note: The example dataset contains four orthomosaics for testing feature extraction. To run prediction and validation analyses using features from all 36 acquisitions, use the provided preprocessed datasets with the analysis workflow.
+**Note:** The example dataset contains four orthomosaics for testing feature extraction. To run prediction and validation analyses using features from all 36 acquisitions, use the provided preprocessed datasets with the `analysis` workflow.
 
 ### Run preprocessing only
 
@@ -201,13 +204,16 @@ python src/run_pipeline.py preprocess
 ### Run prediction and validation modules
 
 ```bash
-python src/run_pipeline.py analysis --target yield
+python src/run_pipeline.py analysis \
+    --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
+    --target yield
 ```
 
 ### Run a single analysis module
 
 ```bash
 python src/run_pipeline.py analysis \
+    --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield \
     --analyses group-kfold
 ```
@@ -251,7 +257,7 @@ python src/group_kfold_predictions.py \
 
 ```bash
 python src/selection_efficiency.py \
-    --predictions path/to/dataset/results/groupkfold_yield/predictions.csv 
+    --predictions results/group_kfold/yield/predictions.csv
 ```
 
 ### Reciprocal location validation
@@ -261,6 +267,8 @@ python src/location_validation.py \
     --input path/to/dataset/results/vi_results_wide_imputed_mice_global.csv \
     --target yield
 ```
+**Note:** Replace `path/to/dataset/results/` with the actual directory containing the downloaded preprocessed CSV files.
+
 ---
 
 ## Customizing Analyses
@@ -308,7 +316,7 @@ The example dataset provides raw input files and preprocessed data for testing t
 The archive contains:
 - Four representative UAV RGB orthomosaics (two per location).
 - Corresponding plot boundary shapefiles, field data, and flight metadata.
-- Extracted vegetation indices and canopy cover from 36 orthomosaics acquired for the same trial at two locations.
+- Extracted vegetation indices and canopy cover from 36 orthomosaics acquired for the corresponding trials at two locations.
 - Preprocessed datasets for machine-learning analyses.
 
 The provided orthomosaics can be used to test feature extraction, while the precomputed datasets enable prediction, validation, and genotype selection-efficiency analyses without processing the complete image collection.
@@ -356,7 +364,7 @@ Custom output locations can be specified through the command-line interface.
 
 ## Reproducibility
 
-The example workflows have been tested using the provided raw and preprocessed datasets, together with the accompanying environment.yml file, on Windows and Ubuntu.
+The example workflows have been tested using the provided raw and preprocessed datasets, together with the accompanying `environment.yml` file, on Windows and Ubuntu.
 
 The unified workflow and all standalone analysis modules produce reproducible results when executed with the same input data and software environment.
 
