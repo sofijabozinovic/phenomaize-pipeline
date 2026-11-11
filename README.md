@@ -166,7 +166,7 @@ The complete example dataset is available on Zenodo:
 
 **https://doi.org/10.5281/zenodo.21676750**
 
-The example dataset includes four representative UAV RGB orthomosaics with corresponding input files, along with precomputed phenotypic features extracted from all 36 orthomosaics across two locations for testing the prediction and validation modules.
+The example dataset includes four representative UAV RGB orthomosaics with corresponding input files, along with extracted and imputed phenotypic features derived from these four orthomosaics for testing the pipeline modules.
 
 Download and extract the dataset before running the examples below, preserving the original directory structure.
 
@@ -193,7 +193,7 @@ This command automatically performs:
 5. reciprocal location validation
 6. selection-efficiency analysis
 
-**Note:** The example dataset contains four orthomosaics for testing feature extraction. To run prediction and validation analyses using features from all 36 acquisitions, use the provided preprocessed datasets with the `analysis` workflow.
+**Note:** The example dataset contains four orthomosaics and corresponding extracted and imputed feature tables, enabling users to test both preprocessing and downstream analysis workflows.
 
 ### Run preprocessing only
 
@@ -316,7 +316,7 @@ The example dataset provides raw input files and preprocessed data for testing t
 The archive contains:
 - Four representative UAV RGB orthomosaics (two per location).
 - Corresponding plot boundary shapefiles, field data, and flight metadata.
-- Extracted vegetation indices and canopy cover from 36 orthomosaics acquired for the corresponding trials at two locations.
+- Extracted vegetation indices and canopy cover from the four provided orthomosaics.
 - Preprocessed datasets for machine-learning analyses.
 
 The provided orthomosaics can be used to test feature extraction, while the precomputed datasets enable prediction, validation, and genotype selection-efficiency analyses without processing the complete image collection.
