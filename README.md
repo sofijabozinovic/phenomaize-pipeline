@@ -344,7 +344,9 @@ Typical outputs include:
 - feature-importance tables
 - reciprocal location-validation results
 - genotype selection-efficiency analyses
-- automatically generated reports for each analysis module
+- automatically generated reports for each analysis 
+
+Prediction and validation outputs are organized by growth stage, based on the prefixes of the selected phenotypic feature columns. Separate analyses are performed for individual stages and for their combined feature set (`All_Phases`). The GroupKFold module additionally organizes model-specific outputs by cross-validation fold. The selection-efficiency module uses the resulting predictions to evaluate genotype selection performance across experiments and models.
 
 The default output structure is:
 
