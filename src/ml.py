@@ -514,7 +514,7 @@ class MLPipeline:
                         "Feature_set": self.args.feature_set,
                         "Stats": self.args.stats,
                         "Include_canopy": self.args.include_canopy,
-                        "Selected_stages": ";".join(self.selected_stages),
+                        "Selected_stages": ";".join(sorted({_growth_stage_from_feature(c) for c in exp_feature_cols})),
                         "Vegetation_indices": ";".join(self.selected_vis),
                     })
 

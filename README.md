@@ -173,6 +173,18 @@ Download and extract the dataset before running the examples below, preserving t
 
 ---
 
+### Important: Plot identifier consistency
+
+For successful vegetation-index extraction and integration with field data, plot identifiers must be consistent across input files.
+
+- The `PlotID` attribute in each `shapefiles/<trial>/plots.shp` file must exactly match the corresponding `plot_id` values in `field_data.csv`.
+- The `trial` values in `flight_info.csv` and `field_data.csv` must match exactly and correspond to the names of the trial-specific folders within `shapefiles/`.
+- Plot identifiers must be unique within each trial.
+
+For example, if a plot is identified as `SD-TOH-P49` in `field_data.csv`, the corresponding `PlotID` in the shapefile must also be `SD-TOH-P49`, not simply `P49`.
+
+**Important:** Mismatched plot identifiers may result in missing vegetation-index values in the final wide-format output (`vi_results_wide.csv`), even when extraction has completed successfully. Users should verify identifier consistency before running the pipeline.
+
 ## Quick Start
 
 The recommended way to use PHENO_MaizE Pipeline is through the unified command-line interface provided by `run_pipeline.py`.
