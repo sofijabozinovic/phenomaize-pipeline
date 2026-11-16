@@ -291,10 +291,13 @@ def filter_features_by_exact_vis(feature_cols, vegetation_indices):
 
 
 def define_experiments(feature_cols, stages=None):
-    """Create one experiment per stage and one combined experiment."""
+    """Group acquisitions by broad phase and add a combined experiment."""
     experiments = {}
     for col in feature_cols:
-        stage = _growth_stage_from_feature(col)
+        # Keep individual acquisition columns as separate predictors, but
+        # group all acquisitions within the same broad phenological phase.
+        full_stage = _growth_stage_from_feature(col)
+        stage = full_stage.split("_", 1)[0]
         experiments.setdefault(stage, []).append(col)
     combined_name = "All_Selected_Stages" if stages else "All_Phases"
     experiments[combined_name] = list(feature_cols)

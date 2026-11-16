@@ -220,20 +220,14 @@ def select_features(df, target, feature_set="veg_qgis", stats="mean_std",
 # Experiments (generalized)
 # -----------------------------
 def define_experiments(feature_cols):
-    """
-    Generalized experiment definition:
-    experiment = prefix before first "_"
-    plus All_Phases = all selected features
-    """
+    """Group acquisitions into broad growth stages; preserve All_Phases unchanged."""
+    stages = ("Emerg", "Veg", "Flow", "Grain", "Mat")
     experiments = {}
     for col in feature_cols:
-        if "_" in col:
-            exp = col.split("_", 1)[0]
-        else:
-            exp = "Unknown"
-        experiments.setdefault(exp, []).append(col)
-
-    experiments["All_Phases"] = feature_cols
+        prefix = str(col).split("_", 1)[0]
+        stage = next((s for s in stages if prefix.lower() == s.lower()), prefix or "Unknown")
+        experiments.setdefault(stage, []).append(col)
+    experiments["All_Phases"] = list(feature_cols)
     return experiments
 
 
@@ -327,15 +321,23 @@ class MLPipeline:
         if not vegetation_indices:
             return feature_cols
         wanted = {v.strip().lower() for v in vegetation_indices if v.strip()}
+        suffixes = (
+            "_mean_all", "_std_all", "_mean_veg_qgis", "_std_veg_qgis",
+            "_mean_veg_exg80", "_std_veg_exg80",
+        )
         selected = []
         for col in feature_cols:
-            first_token = col.split("_", 1)[0].lower()
-            if first_token in wanted:
-                selected.append(col)
-        print(
-            "Vegetation-index filter retained "
-            f"{len(selected)} of {len(feature_cols)} features."
-        )
+            lower = col.lower()
+            if "canopy_cover_" in lower:
+                selected.append(col)  # canopy is controlled by --include-canopy
+                continue
+            for suffix in suffixes:
+                if lower.endswith(suffix):
+                    stem = col[:-len(suffix)]
+                    if "_" in stem and stem.rsplit("_", 1)[1].lower() in wanted:
+                        selected.append(col)
+                    break
+        print(f"Vegetation-index filter retained {len(selected)} of {len(feature_cols)} features.")
         return selected
 
     def _train_cnn(self, X_train, y_train, X_test):
