@@ -344,21 +344,40 @@ Typical outputs include:
 - feature-importance tables
 - reciprocal location-validation results
 - genotype selection-efficiency analyses
-- automatically generated reports for each analysis 
+- automatically generated reports for each analysis module
 
-Prediction and validation outputs are organized by growth stage, based on the prefixes of the selected phenotypic feature columns. Separate analyses are performed for individual stages and for their combined feature set (`All_Phases`). The GroupKFold module additionally organizes model-specific outputs by cross-validation fold. The selection-efficiency module uses the resulting predictions to evaluate genotype selection performance across experiments and models.
+Prediction and validation outputs are organized by growth stage, based on the prefixes of the selected phenotypic feature columns. Separate analyses are performed for individual growth stages and for their combined feature set (All_Phases, or All_Selected_Stages when specific stages are selected). The GroupKFold module additionally organizes model-specific outputs by cross-validation fold. The selection-efficiency module uses the resulting predictions to evaluate genotype selection performance across experiments and models.
 
-The default output structure is:
+An illustrative output directory structure is shown below:
 
 ```text
 results/
 ├── extracted/
 ├── imputed/
 ├── ml/
+│   ├── Emerg/
+│   ├── Veg/
+│   ├── ...
+│   ├── All_Phases/
+│   ├── performance_comparison.png
+│   ├── results_summary.csv
+│   └── report.md
 ├── group_kfold/
+│   ├── Emerg/
+│   │   ├── fold_1/
+│   │   ├── ...
+│   │   └── fold_5/
+│   ├── ...
+│   ├── All_Phases/
+│   │   ├── fold_1/
+│   │   ├── ...
+│   │   └── fold_5/
+│   ├── results_summary.csv
+│   └── results_summary_mean.csv
 ├── location_validation/
 └── selection_efficiency/
 ```
+The directory tree above illustrates the organization of prediction outputs for a representative analysis. Growth-stage subdirectories are generated dynamically from the selected feature columns, while GroupKFold results are additionally separated by cross-validation fold. The exact directory structure and available output files depend on the selected module and analysis settings.
 
 Custom output locations can be specified through the command-line interface.
 
