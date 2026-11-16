@@ -11,7 +11,7 @@ The software supports both:
 
 Developed within the **PHENO_MaizE** project (Grant No 6672, Science Fund of the Republic of Serbia).
 
-> 🚀 **Status:** Preparing release **v1.3.0**
+> 🚀 **Status:** Stable release **v1.3.0**
 
 ---
 
@@ -411,9 +411,9 @@ The project is supported by the **Science Fund of the Republic of Serbia** (Gran
 
 If you use PHENO_MaizE Pipeline in your research, please cite both the software and, when applicable, the accompanying example dataset.
 
-**Software release v1.2.0**
+**Software release v1.3.0**
 
-https://doi.org/10.5281/zenodo.21760531
+https://doi.org/10.5281/zenodo.24275693
 
 **Example dataset**
 
