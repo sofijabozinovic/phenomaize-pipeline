@@ -289,6 +289,25 @@ Common configuration options include:
 
 These options can be freely combined, allowing systematic comparison of different feature subsets and analysis settings.
 
+**Default feature selection.** Unless otherwise specified, the prediction modules use vegetation-index features extracted using the QGIS vegetation mask (`veg_qgis`), including both mean and standard deviation statistics (`mean_std`). Canopy cover features are excluded by default and can be enabled using `--include-canopy`. Users can override these settings through `--feature-set` and `--stats` to select alternative vegetation masks and feature statistics.
+
+### Example: Custom feature selection
+
+The following example runs all five machine-learning models and the available prediction, validation, and selection-efficiency analyses using a KNN-imputed dataset. It selects vegetation indices extracted using the QGIS vegetation mask, includes both mean and standard deviation statistics, and enables canopy cover features.
+
+```bash
+python src/run_pipeline.py analysis \
+    --input path/to/dataset/results/vi_results_wide_imputed_knn_global.csv \
+    --target yield \
+    --feature-set veg_qgis \
+    --stats mean_std \
+    --include-canopy \
+    --models Lasso Ridge RF XGBoost CNN \
+    --show-feature-summary
+```
+
+Replace `path/to/dataset/results/` with the actual directory containing the preprocessed CSV file. The `--show-feature-summary` option prints a summary of the selected predictors, allowing users to verify the feature configuration before interpreting the results.
+
 Most prediction modules also support custom feature filtering using regular expressions.
 
 To display all available options for a specific module, use:
@@ -357,7 +376,7 @@ results/
 ├── imputed/
 ├── ml/
 │   └── yield/
-│       └── veg_qgis_mean_no_canopy_<id>/
+│       └── veg_qgis_mean_std_canopy_<id>/
 │           ├── Emerg/
 │           ├── Veg/
 │           ├── Flow/
@@ -368,14 +387,14 @@ results/
 │           └── report.md
 ├── group_kfold/
 │   └── yield/
-│       └── veg_qgis_mean_no_canopy_<id>/
+│       └── veg_qgis_mean_std_canopy_<id>/
 │           ├── Emerg/
 │           ├── All_Phases/
 │           ├── predictions.csv
 │           └── results_summary_mean.csv
 ├── location_validation/
 │   └── yield/
-│       └── veg_qgis_mean_no_canopy_<id>/
+│       └── veg_qgis_mean_std_canopy_<id>/
 │           ├── predictions.csv
 │           └── location_validation_report.md
 └── selection_efficiency/
