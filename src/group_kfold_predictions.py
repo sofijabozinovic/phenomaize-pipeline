@@ -23,6 +23,8 @@ Supports:
 import os
 import sys
 import argparse
+import hashlib
+import json
 import re
 import warnings
 
@@ -823,7 +825,45 @@ def main():
                               "Example: --stages Emerg Veg_mid_1 Flow_full_2 Grain_blister_2 Mat_physiol_2. "
                               "Matching is case-insensitive but exact by full stage name."))
 
+    explicit_feature_set = "--feature-set" in sys.argv[1:]
+    explicit_stats = "--stats" in sys.argv[1:]
     args = parser.parse_args()
+
+    # --output-dir is the root for this module's results.
+    # Preserve the effective feature-selection defaults, but only display
+    # feature-set/stats in the folder name when explicitly requested.
+    safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
+    if not safe_target:
+        parser.error("--target cannot be used as a directory name")
+    output_parts = [args.output_dir, safe_target]
+    if explicit_feature_set or explicit_stats:
+        label_parts = []
+        if explicit_feature_set:
+            label_parts.append(args.feature_set)
+        if explicit_stats:
+            label_parts.append(args.stats)
+        output_parts.append("_".join(label_parts))
+
+    extra_selection = {
+        "include_canopy": args.include_canopy,
+        "include_regex": args.include_regex,
+        "exclude_regex": args.exclude_regex,
+        "vegetation_indices": args.vegetation_indices,
+        "stages": args.stages,
+    }
+    # Non-default validation choices also require a distinct results folder.
+    if args.cv_mode != "random" or args.group_col != "genotype" or args.n_splits != 5:
+        extra_selection.update({
+            "cv_mode": args.cv_mode,
+            "group_col": args.group_col,
+            "n_splits": args.n_splits,
+        })
+    if any(v for v in extra_selection.values()):
+        signature = hashlib.sha256(
+            json.dumps(extra_selection, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:10]
+        output_parts.append("selection_" + signature)
+    args.output_dir = os.path.join(*output_parts)
 
     if not os.path.exists(args.input):
         print(f"ERROR: Input file not found: {args.input}")

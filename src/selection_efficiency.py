@@ -8,6 +8,9 @@ calculated.
 """
 
 import argparse
+import hashlib
+import json
+import re
 import os
 import sys
 from typing import Iterable
@@ -196,6 +199,54 @@ def plot_actual_vs_predicted_genotype(agg_df: pd.DataFrame, out_dir: str) -> Non
         plt.close()
 
 
+def resolve_output_directory(args, pred_df: pd.DataFrame) -> str:
+    """Organize output by target and retain explicit GroupKFold folder labels."""
+    if "Target" not in pred_df.columns:
+        raise ValueError("predictions.csv has no 'Target' metadata; cannot determine output folder.")
+    targets = pred_df["Target"].dropna().astype(str).unique()
+    if len(targets) != 1:
+        raise ValueError(f"Expected one Target in predictions.csv, found: {list(targets)}")
+    safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", targets[0]).strip("._")
+    if not safe_target:
+        raise ValueError("Target cannot be used as a directory name.")
+    parts = [args.output_dir, safe_target]
+
+    # The prediction metadata contains *effective* defaults, not whether
+    # --feature-set/--stats were explicitly supplied. Preserve the optional
+    # directory label only if it is present in the GroupKFold input path.
+    input_parent = os.path.dirname(os.path.abspath(args.predictions))
+    parent_name = os.path.basename(input_parent)
+    if parent_name.startswith("selection_"):
+        group_dir = os.path.dirname(input_parent)
+        selection_label = parent_name
+    else:
+        group_dir = input_parent
+        selection_label = None
+    feature_label = os.path.basename(group_dir)
+    if feature_label != safe_target:
+        feature_set = str(pred_df["Feature_set"].iloc[0]) if "Feature_set" in pred_df else None
+        stats = str(pred_df["Stats"].iloc[0]) if "Stats" in pred_df else None
+        allowed = {x for x in (feature_set, stats, f"{feature_set}_{stats}") if x and x != "None"}
+        if feature_label in allowed:
+            parts.append(feature_label)
+    if selection_label:
+        parts.append(selection_label)
+
+    # Different selection analyses on the same predictions must not overwrite
+    # each other when non-default fractions or filters are used.
+    nondefault = (args.top_fractions != [0.20, 0.30, 0.40]
+                  or args.bottom_fractions != [0.20, 0.30, 0.40]
+                  or args.models is not None or args.experiments is not None
+                  or args.group_col != "genotype")
+    if nondefault:
+        settings = {"top": args.top_fractions, "bottom": args.bottom_fractions,
+                    "models": args.models, "experiments": args.experiments,
+                    "group_col": args.group_col}
+        digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()[:10]
+        parts.append("selection_analysis_" + digest)
+    return os.path.join(*parts)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Selection-efficiency analysis from GroupKFold predictions."
@@ -221,8 +272,9 @@ def main() -> None:
         if not os.path.exists(args.predictions):
             raise FileNotFoundError(f"Predictions file not found: {args.predictions}")
 
-        ensure_dir(args.output_dir)
         pred_df = pd.read_csv(args.predictions)
+        args.output_dir = resolve_output_directory(args, pred_df)
+        ensure_dir(args.output_dir)
         group_col = resolve_group_column(pred_df, args.group_col)
         pred_df = filter_case_insensitive(pred_df, "Model", args.models)
         pred_df = filter_case_insensitive(pred_df, "Experiment", args.experiments)

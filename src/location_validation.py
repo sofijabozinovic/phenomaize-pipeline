@@ -20,6 +20,8 @@ Supports:
 import os
 import sys
 import argparse
+import hashlib
+import json
 import re
 import numpy as np
 import pandas as pd
@@ -638,7 +640,36 @@ def main():
         help="Optional exact VI names, e.g. NDVI NDRE GNDVI",
     )
 
+    # Preserve feature-selection defaults while naming folders only for
+    # feature options explicitly supplied on the command line.
+    explicit_feature_set = "--feature-set" in sys.argv[1:]
+    explicit_stats = "--stats" in sys.argv[1:]
     args = parser.parse_args()
+
+    safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
+    output_parts = [args.output_dir, safe_target]
+    if explicit_feature_set or explicit_stats:
+        labels = []
+        if explicit_feature_set:
+            labels.append(args.feature_set)
+        if explicit_stats:
+            labels.append(args.stats)
+        output_parts.append("_".join(labels))
+
+    extra_selection = {
+        "include_canopy": args.include_canopy,
+        "include_regex": args.include_regex,
+        "exclude_regex": args.exclude_regex,
+        "vegetation_indices": args.vegetation_indices,
+        "stages": args.stages,
+    }
+    if any(extra_selection.values()):
+        signature = hashlib.sha256(
+            json.dumps(extra_selection, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:10]
+        output_parts.append("selection_" + signature)
+    args.output_dir = os.path.join(*output_parts)
+
     if not os.path.exists(args.input):
         parser.error(f"Input file not found: {args.input}")
 

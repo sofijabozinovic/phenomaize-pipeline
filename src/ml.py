@@ -21,6 +21,8 @@ Supports:
 import os
 import sys
 import argparse
+import hashlib
+import json
 import re
 import numpy as np
 import pandas as pd
@@ -677,7 +679,42 @@ def main():
                         action="store_true",
                         help="Print a summary of selected features.")
 
+    # Keep the effective feature-selection defaults unchanged, but distinguish
+    # options explicitly supplied by the user for output-folder naming.
+    explicit_feature_set = "--feature-set" in sys.argv[1:]
+    explicit_stats = "--stats" in sys.argv[1:]
     args = parser.parse_args()
+
+    # --output-dir is the ROOT for this module's results, not a final run folder.
+    # Example: results/ml/yield/veg_qgis_mean_std/All_Phases/...
+    # If neither option is explicitly supplied, omit the feature/stats level.
+    safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
+    if not safe_target:
+        parser.error("--target cannot be used as a directory name")
+    output_parts = [args.output_dir, safe_target]
+    if explicit_feature_set or explicit_stats:
+        label_parts = []
+        if explicit_feature_set:
+            label_parts.append(args.feature_set)
+        if explicit_stats:
+            label_parts.append(args.stats)
+        output_parts.append("_".join(label_parts))
+
+    # Distinguish runs that use additional feature filters without making
+    # directory names excessively long. Full options remain in report.md.
+    extra_selection = {
+        "include_canopy": args.include_canopy,
+        "include_regex": args.include_regex,
+        "exclude_regex": args.exclude_regex,
+        "vegetation_indices": args.vegetation_indices,
+        "stages": args.stages,
+    }
+    if any(v for v in extra_selection.values()):
+        signature = hashlib.sha256(
+            json.dumps(extra_selection, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:10]
+        output_parts.append("selection_" + signature)
+    args.output_dir = os.path.join(*output_parts)
 
     if not os.path.exists(args.input):
         print(f"ERROR: Input file not found: {args.input}")

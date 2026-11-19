@@ -586,45 +586,66 @@ def run_preprocess(args: argparse.Namespace) -> None:
     print(f"  Flag table:    {flag_path}")
 
 
-def prediction_configuration(args: argparse.Namespace, input_path: Path) -> dict:
-    """All prediction-affecting CLI options, including defaults of child scripts."""
-    return {
-        "input": str(input_path.resolve()),
-        "models": args.models or ["Lasso", "Ridge", "RF", "XGBoost", "CNN"],
-        "alpha": args.alpha if args.alpha is not None else 1.0,
-        "n_estimators": args.n_estimators if args.n_estimators is not None else 200,
-        "cnn_epochs": args.cnn_epochs if args.cnn_epochs is not None else 100,
-        "feature_set": args.feature_set or "veg_qgis",
-        "stats": args.stats or "mean_std",
-        "include_canopy": bool(args.include_canopy),
+def organized_output_dir(args: argparse.Namespace, results_dir: Path, module: str) -> Path:
+    """Mirror the output layout used by the standalone analysis scripts."""
+    safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
+    if not safe_target:
+        raise ValueError("Invalid --target directory name")
+    output = results_dir / module / safe_target
+    labels = []
+    if args.feature_set is not None:
+        labels.append(args.feature_set)
+    if args.stats is not None:
+        labels.append(args.stats)
+    if labels:
+        output /= "_".join(labels)
+
+    extra = {
+        "include_canopy": args.include_canopy,
         "include_regex": args.include_regex,
         "exclude_regex": args.exclude_regex,
         "vegetation_indices": args.vegetation_indices,
         "stages": args.stages,
     }
+    if module == "group_kfold" and (
+        args.cv_mode != "random" or args.group_col != "genotype" or args.n_splits != 5
+    ):
+        extra.update(cv_mode=args.cv_mode, group_col=args.group_col,
+                     n_splits=args.n_splits)
+    if any(extra.values()):
+        digest = hashlib.sha256(json.dumps(extra, sort_keys=True).encode("utf-8")).hexdigest()[:10]
+        output /= "selection_" + digest
+    return output
 
 
-def configuration_folder(args: argparse.Namespace, input_path: Path, module: str) -> str:
-    config = prediction_configuration(args, input_path)
-    if module == "group_kfold":
-        config.update(cv_mode=args.cv_mode, group_col=args.group_col,
-                      n_splits=args.n_splits)
-    digest = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
-    label = f"{config['feature_set']}_{config['stats']}_{'canopy' if config['include_canopy'] else 'no_canopy'}"
-    return f"{label}_{digest}"
+def group_predictions_path(args: argparse.Namespace, results_dir: Path) -> Path:
+    return organized_output_dir(args, results_dir, "group_kfold") / "predictions.csv"
 
 
-def selection_folder(args: argparse.Namespace, predictions_path: Path) -> str:
-    config = {
-        "predictions": str(predictions_path.resolve()),
-        "group_col": args.group_col,
-        "models": args.models,
-        "experiments": args.experiments,
-        "top_fractions": args.top_fractions or [0.2, 0.3, 0.4],
-        "bottom_fractions": args.bottom_fractions or [0.2, 0.3, 0.4],
-    }
-    digest = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
-    return f"{predictions_path.parent.name}_{digest}"
+def selection_output_dir(args: argparse.Namespace, results_dir: Path,
+                         predictions_path: Path, target: str) -> Path:
+    """Mirror selection_efficiency.py output naming from the input path."""
+    output = results_dir / "selection_efficiency" / target
+    parent = predictions_path.parent
+    selection_label = None
+    if parent.name.startswith("selection_"):
+        selection_label = parent.name
+        parent = parent.parent
+    # Only explicit feature/stats labels (not the target) appear in input path.
+    if parent.name != target:
+        output /= parent.name
+    if selection_label:
+        output /= selection_label
+    top = args.top_fractions or [0.20, 0.30, 0.40]
+    bottom = args.bottom_fractions or [0.20, 0.30, 0.40]
+    if (top != [0.20, 0.30, 0.40] or bottom != [0.20, 0.30, 0.40]
+            or args.models is not None or args.experiments is not None
+            or args.group_col != "genotype"):
+        settings = {"top": top, "bottom": bottom, "models": args.models,
+                    "experiments": args.experiments, "group_col": args.group_col}
+        digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()[:10]
+        output /= "selection_analysis_" + digest
+    return output
 
 
 def run_ml(args: argparse.Namespace) -> None:
@@ -633,7 +654,7 @@ def run_ml(args: argparse.Namespace) -> None:
 
     input_path = absolute_path(args.input)
     results_dir = absolute_path(args.results_dir)
-    output_dir = results_dir / "ml" / args.target / configuration_folder(args, input_path, "ml")
+    output_dir = organized_output_dir(args, results_dir, "ml")
 
     if not args.dry_run:
         ensure_input_exists(input_path, "ML input file")
@@ -643,7 +664,7 @@ def run_ml(args: argparse.Namespace) -> None:
     command = build_ml_command(
         input_path=input_path,
         target=args.target,
-        output_dir=output_dir,
+        output_dir=results_dir / "ml",
         args=args,
     )
 
@@ -669,7 +690,7 @@ def run_group_kfold(args: argparse.Namespace) -> None:
 
     input_path = absolute_path(args.input)
     results_dir = absolute_path(args.results_dir)
-    output_dir = results_dir / "group_kfold" / args.target / configuration_folder(args, input_path, "group_kfold")
+    output_dir = organized_output_dir(args, results_dir, "group_kfold")
 
     if not args.dry_run:
         ensure_input_exists(input_path, "GroupKFold input file")
@@ -679,7 +700,7 @@ def run_group_kfold(args: argparse.Namespace) -> None:
     command = build_group_kfold_command(
         input_path=input_path,
         target=args.target,
-        output_dir=output_dir,
+        output_dir=results_dir / "group_kfold",
         args=args,
     )
 
@@ -710,7 +731,7 @@ def run_location_validation(args: argparse.Namespace) -> None:
 
     input_path = absolute_path(args.input)
     results_dir = absolute_path(args.results_dir)
-    output_dir = results_dir / "location_validation" / args.target / configuration_folder(args, input_path, "location_validation")
+    output_dir = organized_output_dir(args, results_dir, "location_validation")
 
     if not args.dry_run:
         ensure_input_exists(input_path, "Location-validation input file")
@@ -720,7 +741,7 @@ def run_location_validation(args: argparse.Namespace) -> None:
     command = build_location_validation_command(
         input_path=input_path,
         target=args.target,
-        output_dir=output_dir,
+        output_dir=results_dir / "location_validation",
         args=args,
     )
 
@@ -751,11 +772,15 @@ def run_selection_efficiency(args: argparse.Namespace) -> None:
 
     if args.predictions:
         predictions_path = absolute_path(args.predictions)
-        target_label = args.target or (
-            predictions_path.parent.parent.name
-            if predictions_path.parent.parent.parent.name == "group_kfold"
-            else predictions_path.parent.name
-        )
+        # When omitted, selection_efficiency.py determines target from CSV.
+        # Infer the target from the organized GroupKFold path for expected outputs.
+        if args.target:
+            target_label = args.target
+        else:
+            ancestor = next((p for p in predictions_path.parents if p.parent.name == "group_kfold"), None)
+            if ancestor is None:
+                raise ValueError("Provide --target when predictions are outside results/group_kfold/<target>/")
+            target_label = ancestor.name
     else:
         if not args.target:
             raise ValueError(
@@ -765,11 +790,10 @@ def run_selection_efficiency(args: argparse.Namespace) -> None:
         target_label = args.target
         if getattr(args, "input", None):
             source_input = absolute_path(args.input)
-            folder = configuration_folder(args, source_input, "group_kfold")
-            predictions_path = results_dir / "group_kfold" / target_label / folder / "predictions.csv"
+            predictions_path = group_predictions_path(args, results_dir)
         else:
             base = results_dir / "group_kfold" / target_label
-            candidates = sorted(base.glob("*/predictions.csv"))
+            candidates = sorted(base.rglob("predictions.csv"))
             if len(candidates) != 1:
                 raise ValueError(
                     f"Found {len(candidates)} matching GroupKFold runs under {base}. "
@@ -783,15 +807,12 @@ def run_selection_efficiency(args: argparse.Namespace) -> None:
             "GroupKFold predictions file",
         )
 
-    output_dir = (
-        results_dir / "selection_efficiency" / target_label
-        / selection_folder(args, predictions_path)
-    )
+    output_dir = selection_output_dir(args, results_dir, predictions_path, target_label)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     command = build_selection_efficiency_command(
         predictions_path=predictions_path,
-        output_dir=output_dir,
+        output_dir=results_dir / "selection_efficiency",
         args=args,
     )
 
@@ -833,8 +854,7 @@ def run_analysis(args: argparse.Namespace) -> None:
         print(f"  - {name}")
 
     if "selection-efficiency" in selected and "group-kfold" not in selected:
-        folder = configuration_folder(analysis_args, resolved_input, "group_kfold")
-        predictions_path = results_dir / "group_kfold" / args.target / folder / "predictions.csv"
+        predictions_path = group_predictions_path(analysis_args, results_dir)
 
         if not predictions_path.is_file() and not args.dry_run:
             raise ValueError(
@@ -854,8 +874,7 @@ def run_analysis(args: argparse.Namespace) -> None:
 
     if "selection-efficiency" in selected:
         selection_args = argparse.Namespace(**vars(analysis_args))
-        folder = configuration_folder(analysis_args, resolved_input, "group_kfold")
-        selection_args.predictions = str(results_dir / "group_kfold" / args.target / folder / "predictions.csv")
+        selection_args.predictions = str(group_predictions_path(analysis_args, results_dir))
         run_selection_efficiency(selection_args)
 
 
