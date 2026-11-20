@@ -33,6 +33,9 @@ import warnings
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.impute import KNNImputer
+from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Lasso, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -96,7 +99,7 @@ class PyTorchCNN(nn.Module):
 def plot_feature_importance(df_imp, out_path, title):
     df_imp = df_imp.sort_values("Importance", ascending=False).head(15)
     plt.figure(figsize=(10, 8))
-    sns.barplot(data=df_imp, x="Importance", y="Feature", palette="viridis")
+    sns.barplot(data=df_imp, x="Importance", y="Feature", hue="Feature", palette="viridis", legend=False)
     plt.title(title)
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -130,7 +133,8 @@ def _base_numeric_features(df, target):
     num_cols = df.select_dtypes(include="number").columns.tolist()
     feats = [
         c for c in num_cols
-        if (c not in BLACKLIST)
+        if re.fullmatch(r".+_(?:mean|std)_(?:all|veg_qgis|veg_exg80)|.+_canopy_cover_(?:qgis|exg80)", c, flags=re.IGNORECASE)
+        and (c not in BLACKLIST)
         and (c not in TARGET_COLUMNS)
         and (c != target)
     ]
@@ -277,6 +281,15 @@ class MLPipeline:
             show_summary=args.show_feature_summary,
         )
 
+        # Exclude features entirely absent at either location (unavailable acquisitions).
+        unavailable = [c for c in self.feature_cols if any(
+            not self.df.loc[self.df["location"].eq(loc), c].notna().any()
+            for loc in self.locations
+        )]
+        if unavailable:
+            print(f"Excluded {len(unavailable)} features entirely missing at a location.")
+            self.feature_cols = [c for c in self.feature_cols if c not in set(unavailable)]
+
         self.feature_cols = self._filter_stages(self.feature_cols, args.stages)
         self.feature_cols = self._filter_vegetation_indices(
             self.feature_cols, args.vegetation_indices
@@ -304,7 +317,9 @@ class MLPipeline:
             f.write("## Feature selection\n\n")
             f.write(f"- feature_set: `{self.args.feature_set}`\n")
             f.write(f"- stats: `{self.args.stats}`\n")
-            f.write(f"- include_canopy: `{self.args.include_canopy}`\n")
+            f.write(f"- include_canopy: `{self.args.include_canopy}`\\n")
+            f.write(f"- missing_policy: `{self.args.missing_policy}`\\n")
+            f.write(f"- entirely unavailable columns excluded: `{len(unavailable)}`\\n")
             f.write(f"- stages: `{self.args.stages}`\n")
             f.write(f"- vegetation_indices: `{self.args.vegetation_indices}`\n")
             f.write(f"- selected features: `{len(self.feature_cols)}`\n\n")
@@ -343,12 +358,20 @@ class MLPipeline:
         return selected
 
     def _train_cnn(self, X_train, y_train, X_test):
+        # Seed each CNN fit independently, including DataLoader shuffling.
+        # GPU numerical reproducibility can still depend on the platform.
+        torch.manual_seed(42)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(42)
+        loader_generator = torch.Generator()
+        loader_generator.manual_seed(42)
         model = PyTorchCNN(X_train.shape[1]).to(self.device)
         Xtr = torch.tensor(X_train, dtype=torch.float32).to(self.device)
         ytr = torch.tensor(y_train, dtype=torch.float32).view(-1, 1).to(self.device)
         Xte = torch.tensor(X_test, dtype=torch.float32).to(self.device)
 
-        loader = DataLoader(TensorDataset(Xtr, ytr), batch_size=32, shuffle=True)
+        loader = DataLoader(TensorDataset(Xtr, ytr), batch_size=32, shuffle=True,
+                            generator=loader_generator)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         loss_fn = nn.MSELoss()
 
@@ -398,6 +421,40 @@ class MLPipeline:
 
         return y_pred, importance
 
+    def _prepare_split(self, X_train, X_test, features):
+        """Fit imputer and scaler on training LOCATION only."""
+        X_train = np.asarray(X_train, dtype=float).copy()
+        X_test = np.asarray(X_test, dtype=float).copy()
+        if np.isinf(X_train).any() or np.isinf(X_test).any():
+            raise ValueError("Infinite predictor values; clean the input CSV.")
+        missing_train = np.isnan(X_train).sum()
+        missing_test = np.isnan(X_test).sum()
+        if self.args.missing_policy == "drop":
+            if missing_train or missing_test:
+                raise ValueError("NaNs remain; choose fold_mice or fold_knn.")
+        else:
+            empty_train = np.isnan(X_train).all(axis=0)
+            if empty_train.any():
+                raise ValueError(
+                    f"{empty_train.sum()} predictors have no training-location observations: "
+                    + ", ".join(np.asarray(features)[empty_train][:5])
+                )
+            if self.args.missing_policy == "fold_mice":
+                imputer = IterativeImputer(
+                    max_iter=self.args.impute_max_iter,
+                    n_nearest_features=(self.args.impute_nearest_features or None),
+                    random_state=42,
+                    skip_complete=True,
+                )
+            else:
+                imputer = KNNImputer(n_neighbors=min(self.args.impute_neighbors, len(X_train)))
+            X_train = imputer.fit_transform(X_train)
+            X_test = imputer.transform(X_test)
+        if not np.isfinite(X_train).all() or not np.isfinite(X_test).all():
+            raise ValueError("Non-finite values remain after preprocessing.")
+        scaler = StandardScaler()
+        return scaler.fit_transform(X_train), scaler.transform(X_test), missing_train, missing_test
+
     def run_location_validation(self, train_location, test_location):
         validation_name = f"train_{train_location}_test_{test_location}"
         train_df = self.df[self.df["location"] == train_location].copy()
@@ -422,9 +479,15 @@ class MLPipeline:
             X_test = test_df[exp_features].to_numpy()
             y_test = test_df[self.args.target].to_numpy().reshape(-1)
 
-            scaler = StandardScaler()
-            X_train_scaled = scaler.fit_transform(X_train)
-            X_test_scaled = scaler.transform(X_test)
+            try:
+                X_train_scaled, X_test_scaled, n_missing_train, n_missing_test = (
+                    self._prepare_split(X_train, X_test, exp_features)
+                )
+            except Exception as exc:
+                print(f"  {exp_name}: preprocessing FAILED: {exc}")
+                with open(self.report_path, "a", encoding="utf-8") as f:
+                    f.write(f"### {exp_name}: preprocessing FAILED: `{exc}`\\n\\n")
+                continue
 
             with open(self.report_path, "a", encoding="utf-8") as f:
                 f.write(f"### Experiment: {exp_name}\n\n")
@@ -453,6 +516,8 @@ class MLPipeline:
                         "N_train": len(train_df),
                         "N_test": len(test_df),
                         "N_features": len(exp_features),
+                        "Include_canopy": self.args.include_canopy,
+                        "Missing_policy": self.args.missing_policy,
                         "R2": r2,
                         "RMSE": rmse,
                         "MAE": mae,
@@ -624,6 +689,12 @@ def main():
         "--stats", choices=["mean", "std", "mean_std"], default="mean_std"
     )
     parser.add_argument("--include-canopy", action="store_true")
+    parser.add_argument("--missing-policy", choices=["fold_mice", "fold_knn", "drop"],
+                        default="fold_mice")
+    parser.add_argument("--impute-max-iter", type=int, default=10)
+    parser.add_argument("--impute-nearest-features", type=int, default=20,
+                        help="0 uses all predictors for MICE")
+    parser.add_argument("--impute-neighbors", type=int, default=5)
     parser.add_argument("--include-regex", default=None)
     parser.add_argument("--exclude-regex", default=None)
     parser.add_argument("--show-feature-summary", action="store_true")
@@ -646,29 +717,13 @@ def main():
     explicit_stats = "--stats" in sys.argv[1:]
     args = parser.parse_args()
 
+    # Output layout: results/<module>/<target>/<feature_set>_<stats>/<stage>/...
     safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
-    output_parts = [args.output_dir, safe_target]
-    if explicit_feature_set or explicit_stats:
-        labels = []
-        if explicit_feature_set:
-            labels.append(args.feature_set)
-        if explicit_stats:
-            labels.append(args.stats)
-        output_parts.append("_".join(labels))
-
-    extra_selection = {
-        "include_canopy": args.include_canopy,
-        "include_regex": args.include_regex,
-        "exclude_regex": args.exclude_regex,
-        "vegetation_indices": args.vegetation_indices,
-        "stages": args.stages,
-    }
-    if any(extra_selection.values()):
-        signature = hashlib.sha256(
-            json.dumps(extra_selection, sort_keys=True).encode("utf-8")
-        ).hexdigest()[:10]
-        output_parts.append("selection_" + signature)
-    args.output_dir = os.path.join(*output_parts)
+    if not safe_target:
+        parser.error("--target cannot be used as a directory name")
+    args.output_dir = os.path.join(args.output_dir, safe_target,
+                                   f"{args.feature_set}_{args.stats}" +
+                                   ("_canopy" if args.include_canopy else ""))
 
     if not os.path.exists(args.input):
         parser.error(f"Input file not found: {args.input}")

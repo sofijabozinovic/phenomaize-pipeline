@@ -11,7 +11,7 @@ The software supports both:
 
 Developed within the **PHENO_MaizE** project (Grant No 6672, Science Fund of the Republic of Serbia).
 
-> 🚀 **Status:** Stable release **v1.3.0**
+> **Release documentation:** v1.3.0 (existing published release). The updated pipeline described here is being validated for a future release; version and DOI will be confirmed before publication.
 
 ---
 
@@ -84,7 +84,7 @@ The recommended way to use PHENO_MaizE Pipeline is through the unified command-l
 The pipeline can be executed at different levels depending on the desired workflow:
 
 - **`preprocess`** – performs vegetation-index extraction followed by missing-value imputation.
-- **`analysis`** – executes one or more prediction and validation modules using an imputed dataset.
+- **`analysis`** – executes one or more prediction and validation modules using a feature table; for unbiased evaluation with fold-wise imputation, use a table that has not been globally imputed.
 - **`full`** – runs the complete workflow from UAV-derived vegetation-index extraction to agronomic trait prediction and evaluation.
 
 For advanced users, every module can also be executed independently.
@@ -125,17 +125,13 @@ PHENO_MaizE Pipeline consists of a unified workflow interface together with modu
 
 ## Requirements
 
-The pipeline has been tested on:
+A clean Conda installation and an analytical workflow have been successfully tested on a Windows computer without an NVIDIA GPU. The installation test verified imports of the principal dependencies and execution of the unified CLI. The analytical test used Ridge, the original wide feature table, and fold-wise MICE imputation across ML prediction, GroupKFold, reciprocal location validation, and selection-efficiency analysis.
 
-- Windows 11
-- Ubuntu 24.04 LTS
-- Python 3.11
+The environment allows Python 3.11 or 3.12. Confirmed testing on Ubuntu 24.04 LTS, the exact Windows edition, and additional Python versions should be documented separately when verified.
 
-The software has been tested using Conda environments on both operating systems.
+The accompanying `environment.yml` specifies the main Conda and pip dependencies. Package versions are not fully pinned; for exact reproduction, preserve an export of the tested resolved environment. The unpinned dependencies may resolve to different versions on later installations.
 
-All required dependencies are provided in the accompanying environment.yml file.
-
-After installing all dependencies, the complete workflow can be executed through the unified command-line interface (`run_pipeline.py`) or by running individual modules independently.
+After installing all dependencies, the workflow can be executed through the unified command-line interface (`run_pipeline.py`) or by running individual modules independently. Successful clean-install testing of the analytical workflow does not, by itself, verify fresh orthomosaic extraction or the entire end-to-end workflow.
 
 ---
 
@@ -162,6 +158,16 @@ python src/run_pipeline.py --help
 ```
 
 This command displays all available workflow modules and analysis options.
+
+### CPU and optional NVIDIA GPU support
+
+The standard `environment.yml` installs PyTorch through pip, but does not guarantee a CUDA-enabled build. On a computer without a supported NVIDIA GPU, PyTorch can run the CNN on the CPU. For NVIDIA GPU acceleration, install a compatible CUDA-enabled PyTorch build following the official PyTorch installation instructions for the target operating system and driver, then verify `torch.cuda.is_available()`. GPU availability alone does not prove that every script uses the GPU; verify device selection during an actual CNN run.
+
+```bash
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
+```
+
+The documented clean-install test used a CPU-only PyTorch build. NVIDIA GPU execution remains to be checked separately.
 
 The complete example dataset is available on Zenodo:
 
@@ -270,7 +276,7 @@ python src/group_kfold_predictions.py \
 
 ```bash
 python src/selection_efficiency.py \
-    --predictions results/group_kfold/yield/<configuration_id>/predictions.csv
+    --predictions results/group_kfold/yield/veg_qgis_mean_std/predictions.csv
 ```
 
 ### Reciprocal location validation
@@ -286,7 +292,7 @@ python src/location_validation.py \
 
 ## Customizing Analyses
 
-All prediction modules share a common command-line interface, allowing analyses to be customized without modifying the source code.
+Prediction modules expose overlapping command-line options, allowing analyses to be customized without modifying the source code.
 
 The unified workflow (`run_pipeline.py`) forwards these options to the corresponding analysis modules, providing the same flexibility through a single entry point.
 
@@ -299,22 +305,39 @@ Common configuration options include:
 - vegetation-index statistics
 - canopy cover inclusion
 
-These options can be freely combined, allowing systematic comparison of different feature subsets and analysis settings.
+These options can be combined where supported by the relevant module, allowing systematic comparison of different feature subsets and analysis settings.
 
 **Default feature selection.** Unless otherwise specified, the prediction modules use vegetation-index features extracted using the QGIS vegetation mask (`veg_qgis`), including both mean and standard deviation statistics (`mean_std`). Canopy cover features are excluded by default and can be enabled using `--include-canopy`. Users can override these settings through `--feature-set` and `--stats` to select alternative vegetation masks and feature statistics.
 
-### Example: Custom feature selection
+### Missing-data handling during model validation
 
-The following example runs all five machine-learning models and the available prediction, validation, and selection-efficiency analyses using a KNN-imputed dataset. It selects vegetation indices extracted using the QGIS vegetation mask, includes both mean and standard deviation statistics, and enables canopy cover features.
+The standalone `impute.py` module can generate globally imputed feature tables for exploratory or preprocessing workflows. For evaluation of predictive performance, however, globally imputing the full dataset before splitting it may leak information from validation observations into training. The updated prediction modules support training-only missing-data handling (`--missing-policy fold_mice`, `fold_knn`, or `drop`), fitting the imputer on the training subset within each split or fold and applying that fitted transformation to held-out data. Reciprocal location validation fits preprocessing using the training location only. Prefer supplying a feature table that has **not** been globally imputed when using fold-wise imputation.
+
+For example, the following analysis command uses the original wide feature table and fold-wise MICE:
 
 ```bash
 python src/run_pipeline.py analysis \
-    --input path/to/dataset/results/vi_results_wide_imputed_knn_global.csv \
+    --input path/to/dataset/results/vi_results_wide.csv \
+    --target yield \
+    --feature-set veg_qgis \
+    --stats mean \
+    --include-canopy \
+    --missing-policy fold_mice
+```
+
+### Example: Custom feature selection
+
+The following example runs all five machine-learning models and the available prediction, validation, and selection-efficiency analyses using a wide feature table with training-only missing-data handling. It selects vegetation indices extracted using the QGIS vegetation mask, includes both mean and standard deviation statistics, and enables canopy cover features.
+
+```bash
+python src/run_pipeline.py analysis \
+    --input path/to/dataset/results/vi_results_wide.csv \
     --target yield \
     --feature-set veg_qgis \
     --stats mean_std \
     --include-canopy \
     --models Lasso Ridge RF XGBoost CNN \
+    --missing-policy fold_mice \
     --show-feature-summary
 ```
 
@@ -380,7 +403,7 @@ Typical outputs include:
 
 Prediction and validation experiments are organized by broad phenological phase (`Emerg`, `Veg`, `Flow`, `Grain`, `Mat`). All acquisition dates belonging to the same phase are included in a single phase-specific experiment, while the features from each acquisition remain separate predictors rather than being averaged across dates. A combined `All_Phases` experiment is also generated (`All_Selected_Stages` when specific stages are selected). GroupKFold additionally organizes model-specific outputs by cross-validation fold. Selection-efficiency analysis uses GroupKFold predictions to evaluate genotype selection across experiments and models.
 
-Prediction and validation results are stored under the analysis module, target trait, and a configuration-specific directory. An illustrative output structure is:
+Prediction and validation results are stored under the analysis module, target trait, and a feature-configuration directory named `<feature_set>_<stats>`, with `_canopy` appended when canopy cover is included. The GroupKFold **script** is `group_kfold_predictions.py`, while its **results directory** is `group_kfold/`. An illustrative output structure is:
 
 ```text
 results/
@@ -388,7 +411,7 @@ results/
 ├── imputed/
 ├── ml/
 │   └── yield/
-│       └── veg_qgis_mean_std_canopy_<id>/
+│       └── veg_qgis_mean_std_canopy/
 │           ├── Emerg/
 │           ├── Veg/
 │           ├── Flow/
@@ -399,14 +422,14 @@ results/
 │           └── report.md
 ├── group_kfold/
 │   └── yield/
-│       └── veg_qgis_mean_std_canopy_<id>/
+│       └── veg_qgis_mean_std_canopy/
 │           ├── Emerg/
 │           ├── All_Phases/
 │           ├── predictions.csv
 │           └── results_summary_mean.csv
 ├── location_validation/
 │   └── yield/
-│       └── veg_qgis_mean_std_canopy_<id>/
+│       └── veg_qgis_mean_std_canopy/
 │           ├── predictions.csv
 │           └── location_validation_report.md
 └── selection_efficiency/
@@ -418,15 +441,15 @@ results/
 
 The directory tree is illustrative: experiment folders and output files depend on the selected modules, features, and settings. GroupKFold experiment folders contain fold-specific results.
 
-Custom output locations can be specified through the command-line interface.
+Custom output locations can be specified through the command-line interface. **Note:** Runs that share the same target, feature set, statistics, and canopy setting may write to the same directory even if other options (e.g., vegetation-index filters or selected stages) differ. Use separate `--results-dir` locations to preserve distinct configurations; `--force` overwrites/recomputes existing results.
 
 ---
 
 ## Reproducibility
 
-The example workflows have been tested using the provided raw and preprocessed datasets, together with the accompanying `environment.yml` file, on Windows and Ubuntu.
+Analytical workflows have been tested using the provided feature data, including a successful clean Conda installation and CPU-based Ridge analysis. Two repeated CNN runs with the same settings produced identical reported evaluation metrics in the tested environment. This is evidence of within-environment metric reproducibility, not a guarantee of identical results across operating systems, PyTorch builds, or CPU/GPU hardware.
 
-The unified workflow and all standalone analysis modules produce reproducible results when executed with the same input data and software environment.
+Reproducibility depends on the input data, software versions, random seeds, and computational environment. For an exact computational record, archive the resolved environment (for example, `conda list --explicit` and `pip freeze`) alongside the analysis configuration and outputs.
 
 ---
 
@@ -442,7 +465,7 @@ The project is supported by the **Science Fund of the Republic of Serbia** (Gran
 
 If you use PHENO_MaizE Pipeline in your research, please cite both the software and, when applicable, the accompanying example dataset.
 
-**Software release v1.3.0**
+**Existing software release v1.3.0**
 
 https://doi.org/10.5281/zenodo.24275693
 
@@ -450,7 +473,7 @@ https://doi.org/10.5281/zenodo.24275693
 
 https://doi.org/10.5281/zenodo.21676750
 
-Citation metadata are provided through the `CITATION.cff` file and GitHub's **Cite this repository** feature.
+Citation metadata are provided through the `CITATION.cff` file and GitHub's **Cite this repository** feature. Update the release number, citation metadata, and version-specific Zenodo DOI when publishing the next release.
 
 ---
 

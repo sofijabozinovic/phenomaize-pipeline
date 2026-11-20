@@ -37,6 +37,9 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split, GroupKFold
 from sklearn.preprocessing import StandardScaler
+from sklearn.impute import KNNImputer
+from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Lasso, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -64,7 +67,7 @@ BLACKLIST = {
 
 # Known response variables excluded from predictors to reduce target leakage.
 # --target itself is flexible and may be any numeric column in the input CSV.
-TARGET_COLUMNS = {"yield", "moisture", "dta"}
+TARGET_COLUMNS = {"yield", "yield_moist", "moisture", "dta", "pltwt"}
 
 
 # -----------------------------
@@ -101,7 +104,7 @@ class PyTorchCNN(nn.Module):
 def plot_feature_importance(df_imp, out_path, title):
     df_imp = df_imp.sort_values("Importance", ascending=False).head(15)
     plt.figure(figsize=(10, 8))
-    sns.barplot(data=df_imp, x="Importance", y="Feature", palette="viridis")
+    plt.barh(df_imp["Feature"].iloc[::-1], df_imp["Importance"].iloc[::-1])
     plt.title(title)
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -113,7 +116,7 @@ def plot_actual_vs_pred(y_true, y_pred, out_path, title):
     y_pred = np.asarray(y_pred).reshape(-1)
 
     plt.figure(figsize=(8, 8))
-    sns.scatterplot(x=y_true, y=y_pred, alpha=0.6)
+    plt.scatter(y_true, y_pred, alpha=0.6)
 
     mn = float(min(y_true.min(), y_pred.min()))
     mx = float(max(y_true.max(), y_pred.max()))
@@ -339,7 +342,9 @@ class MLPipeline:
         os.makedirs(self.output_dir, exist_ok=True)
 
         print(f"Loading data from {args.input}...")
-        self.df = pd.read_csv(args.input)
+        self.df = pd.read_csv(args.input, low_memory=False)
+        if "location" not in self.df.columns:
+            raise ValueError("Location column is required for conservative missing-data handling.")
         if args.target not in self.df.columns:
             raise ValueError(f"Target '{args.target}' not found in input file.")
 
@@ -380,6 +385,17 @@ class MLPipeline:
             vi for vi in (_vegetation_index_from_feature(c) for c in self.feature_cols)
             if vi is not None
         })
+        # A phase absent from any location cannot be reconstructed from that
+        # location. Exclude such features BEFORE defining experiments.
+        original_features = list(self.feature_cols)
+        self.unavailable_features = []
+        for col in original_features:
+            if self.df.groupby("location", dropna=False)[col].apply(lambda v: v.isna().all()).any():
+                self.unavailable_features.append(col)
+        self.feature_cols = [c for c in original_features if c not in self.unavailable_features]
+        if not self.feature_cols:
+            raise RuntimeError("No predictors remain after excluding unavailable location-feature combinations.")
+        print(f"Excluded {len(self.unavailable_features)} features absent in at least one location.")
         self.experiments = define_experiments(self.feature_cols, stages=args.stages)
         self.results = []
         self.predictions = []
@@ -405,19 +421,33 @@ class MLPipeline:
             f.write(f"- stages: `{self.selected_stages}`\n")
             f.write(f"- vegetation_indices: `{self.selected_vis}`\n")
             f.write(f"- cv_mode: `{self.args.cv_mode}`\n")
+            f.write(f"- missing_policy: `{self.args.missing_policy}`\n")
+            if self.args.missing_policy == "fold_mice":
+                f.write(f"- MICE max_iter: `{self.args.impute_max_iter}`\n")
+                f.write(f"- MICE nearest_features: `{self.args.impute_nearest_features}`\n")
+            f.write(f"- unavailable features excluded ({len(self.unavailable_features)}): "
+                    f"`{', '.join(self.unavailable_features)}`\n")
             if self.args.cv_mode == "hybrid_groupkfold":
                 f.write(f"- group_col: `{self.args.group_col}`\n")
                 f.write(f"- n_splits: `{self.args.n_splits}`\n")
             f.write("\n")
 
     def _train_cnn(self, X_train, y_train, X_test):
+        # Seed each CNN fit independently, including DataLoader shuffling.
+        # GPU numerical reproducibility can still depend on the platform.
+        torch.manual_seed(42)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(42)
+        loader_generator = torch.Generator()
+        loader_generator.manual_seed(42)
         model = PyTorchCNN(X_train.shape[1]).to(self.device)
 
         Xtr = torch.tensor(X_train, dtype=torch.float32).to(self.device)
         ytr = torch.tensor(y_train, dtype=torch.float32).view(-1, 1).to(self.device)
         Xte = torch.tensor(X_test, dtype=torch.float32).to(self.device)
 
-        loader = DataLoader(TensorDataset(Xtr, ytr), batch_size=32, shuffle=True)
+        loader = DataLoader(TensorDataset(Xtr, ytr), batch_size=32, shuffle=True,
+                            generator=loader_generator)
         opt = torch.optim.Adam(model.parameters(), lr=0.001)
         loss_fn = nn.MSELoss()
 
@@ -448,7 +478,7 @@ class MLPipeline:
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
             splits.append((
-                "random_split", X_train, X_test, y_train, y_test, test_idx
+                "random_split", X_train, X_test, y_train, y_test, train_idx, test_idx
             ))
 
         elif self.args.cv_mode == "hybrid_groupkfold":
@@ -473,12 +503,69 @@ class MLPipeline:
             ):
                 X_train, X_test = X[train_idx], X[test_idx]
                 y_train, y_test = y[train_idx], y[test_idx]
-                splits.append((f"fold_{fold_id}", X_train, X_test, y_train, y_test, test_idx))
+                splits.append((f"fold_{fold_id}", X_train, X_test, y_train, y_test, train_idx, test_idx))
 
         else:
             raise ValueError(f"Unknown cv-mode: {self.args.cv_mode}")
 
         return splits
+
+    def _prepare_fold(self, X_train, X_test, train_idx, test_idx, feature_cols):
+        """Location-wise, training-only MICE/KNN for isolated missing measurements.
+
+        No imputation for entire missing acquisition/location combinations:
+        those columns are removed once before experiments are defined.
+        """
+        X_train = X_train.astype(float, copy=True)
+        X_test = X_test.astype(float, copy=True)
+        if not np.isfinite(X_train[~np.isnan(X_train)]).all() or not np.isfinite(X_test[~np.isnan(X_test)]).all():
+            raise ValueError("Infinite feature values found; clean input CSV first.")
+        if self.args.missing_policy == "drop":
+            if np.isnan(X_train).any() or np.isnan(X_test).any():
+                raise ValueError("Remaining isolated NaNs found with --missing-policy drop; use fold_mice or fold_knn.")
+            scaler = StandardScaler()
+            return scaler.fit_transform(X_train), scaler.transform(X_test)
+
+        train_locations = self.df.iloc[train_idx]["location"].to_numpy()
+        test_locations = self.df.iloc[test_idx]["location"].to_numpy()
+        for loc in np.unique(np.concatenate([train_locations, test_locations])):
+            tr = np.flatnonzero(train_locations == loc)
+            te = np.flatnonzero(test_locations == loc)
+            if not len(te) and not np.isnan(X_train[tr]).any():
+                continue
+            if not len(tr):
+                raise ValueError(f"No training rows for location {loc!r}.")
+            # Within this fold/location, a feature with zero observed training
+            # measurements is not estimable; never silently borrow from another location.
+            empty = np.isnan(X_train[tr]).all(axis=0)
+            if empty.any():
+                bad = [feature_cols[i] for i in np.flatnonzero(empty)]
+                raise ValueError(f"No observed training values at {loc!r}: {bad[:8]}")
+            if not np.isnan(X_train[tr]).any() and (not len(te) or not np.isnan(X_test[te]).any()):
+                continue
+            local_scaler = StandardScaler()
+            scaled_train = local_scaler.fit_transform(X_train[tr])
+            if self.args.missing_policy == "fold_mice":
+                imputer = IterativeImputer(
+                    max_iter=self.args.impute_max_iter,
+                    random_state=42,
+                    n_nearest_features=(
+                        min(self.args.impute_nearest_features, scaled_train.shape[1])
+                        if self.args.impute_nearest_features > 0 else None
+                    ),
+                    skip_complete=False,
+                )
+            else:
+                imputer = KNNImputer(n_neighbors=min(self.args.impute_neighbors, len(tr)))
+            filled_train = imputer.fit_transform(scaled_train)
+            X_train[tr] = local_scaler.inverse_transform(filled_train)
+            if len(te):
+                scaled_test = local_scaler.transform(X_test[te])
+                X_test[te] = local_scaler.inverse_transform(imputer.transform(scaled_test))
+        if np.isnan(X_train).any() or np.isnan(X_test).any():
+            raise ValueError("NaNs remain after fold-wise imputation.")
+        scaler = StandardScaler()
+        return scaler.fit_transform(X_train), scaler.transform(X_test)
 
     def run(self):
         for exp_name, exp_feature_cols in self.experiments.items():
@@ -498,15 +585,14 @@ class MLPipeline:
 
             splits = self._make_splits(X, y, exp_name)
 
-            for split_name, X_train, X_test, y_train, y_test, test_idx in splits:
+            for split_name, X_train, X_test, y_train, y_test, train_idx, test_idx in splits:
                 print(f"\n--- Split: {split_name} ---")
 
                 split_dir = os.path.join(exp_dir, split_name)
                 os.makedirs(split_dir, exist_ok=True)
 
-                scaler = StandardScaler()
-                X_train_scaled = scaler.fit_transform(X_train)
-                X_test_scaled = scaler.transform(X_test)
+                X_train_scaled, X_test_scaled = self._prepare_fold(
+                    X_train, X_test, train_idx, test_idx, exp_feature_cols)
 
                 with open(self.report_path, "a", encoding="utf-8") as f:
                     f.write(f"### Split: {split_name}\n\n")
@@ -687,18 +773,16 @@ class MLPipeline:
         # Comparison plot uses mean metrics across splits
         fig, axes = plt.subplots(1, 2, figsize=(20, 8))
 
-        sns.barplot(
-            x="Experiment", y="R2_mean", hue="Model",
-            data=summary_df, ax=axes[0], palette="magma"
-        )
+        for model_name, subset in summary_df.groupby("Model"):
+            axes[0].plot(subset["Experiment"], subset["R2_mean"], "o-", label=model_name)
+        axes[0].legend()
         axes[0].set_title("Model comparison by mean R²", fontsize=16)
         axes[0].tick_params(axis="x", rotation=45)
         axes[0].set_ylabel("Mean R² score")
 
-        sns.barplot(
-            x="Experiment", y="RMSE_mean", hue="Model",
-            data=summary_df, ax=axes[1], palette="magma"
-        )
+        for model_name, subset in summary_df.groupby("Model"):
+            axes[1].plot(subset["Experiment"], subset["RMSE_mean"], "o-", label=model_name)
+        axes[1].legend()
         axes[1].set_title("Model comparison by mean RMSE", fontsize=16)
         axes[1].tick_params(axis="x", rotation=45)
         axes[1].set_ylabel("Mean root mean squared error")
@@ -762,9 +846,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument("--input", required=True, help="Input CSV (imputed features)")
+    parser.add_argument("--input", required=True, help="Input CSV with measured VI features; isolated gaps handled fold-wise")
     parser.add_argument("--target", required=True, help="Numeric target column")
-    parser.add_argument("--output-dir", default="ml_results")
+    parser.add_argument("--output-dir", default="results/group_kfold")
 
     parser.add_argument("--models", nargs="+",
                         default=["Lasso", "Ridge", "RF", "XGBoost", "CNN"],
@@ -773,6 +857,16 @@ def main():
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument("--n-estimators", type=int, default=200)
     parser.add_argument("--cnn-epochs", type=int, default=100)
+
+    parser.add_argument("--missing-policy", choices=["fold_mice", "fold_knn", "drop"],
+                        default="fold_mice",
+                        help="Impute isolated gaps within each training fold/location with MICE (default) "
+                             "or KNN; 'drop' requires complete selected columns.")
+    parser.add_argument("--impute-neighbors", type=int, default=5)
+    parser.add_argument("--impute-max-iter", type=int, default=10,
+                        help="Maximum MICE iterations (default: 10).")
+    parser.add_argument("--impute-nearest-features", type=int, default=20,
+                        help="Predictors sampled for each MICE regression (default: 20; 0 = all).")
 
     # CV args
     parser.add_argument("--cv-mode",
@@ -829,41 +923,12 @@ def main():
     explicit_stats = "--stats" in sys.argv[1:]
     args = parser.parse_args()
 
-    # --output-dir is the root for this module's results.
-    # Preserve the effective feature-selection defaults, but only display
-    # feature-set/stats in the folder name when explicitly requested.
+    # Output layout: results/<module>/<target>/<feature_set>_<stats>/<stage>/...
     safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
     if not safe_target:
         parser.error("--target cannot be used as a directory name")
-    output_parts = [args.output_dir, safe_target]
-    if explicit_feature_set or explicit_stats:
-        label_parts = []
-        if explicit_feature_set:
-            label_parts.append(args.feature_set)
-        if explicit_stats:
-            label_parts.append(args.stats)
-        output_parts.append("_".join(label_parts))
-
-    extra_selection = {
-        "include_canopy": args.include_canopy,
-        "include_regex": args.include_regex,
-        "exclude_regex": args.exclude_regex,
-        "vegetation_indices": args.vegetation_indices,
-        "stages": args.stages,
-    }
-    # Non-default validation choices also require a distinct results folder.
-    if args.cv_mode != "random" or args.group_col != "genotype" or args.n_splits != 5:
-        extra_selection.update({
-            "cv_mode": args.cv_mode,
-            "group_col": args.group_col,
-            "n_splits": args.n_splits,
-        })
-    if any(v for v in extra_selection.values()):
-        signature = hashlib.sha256(
-            json.dumps(extra_selection, sort_keys=True).encode("utf-8")
-        ).hexdigest()[:10]
-        output_parts.append("selection_" + signature)
-    args.output_dir = os.path.join(*output_parts)
+    args.output_dir = os.path.join(args.output_dir, safe_target,
+                                   f"{args.feature_set}_{args.stats}" + ("_canopy" if args.include_canopy else ""))
 
     if not os.path.exists(args.input):
         print(f"ERROR: Input file not found: {args.input}")

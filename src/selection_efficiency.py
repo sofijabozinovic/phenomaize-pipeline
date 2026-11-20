@@ -209,42 +209,26 @@ def resolve_output_directory(args, pred_df: pd.DataFrame) -> str:
     safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", targets[0]).strip("._")
     if not safe_target:
         raise ValueError("Target cannot be used as a directory name.")
-    parts = [args.output_dir, safe_target]
-
-    # The prediction metadata contains *effective* defaults, not whether
-    # --feature-set/--stats were explicitly supplied. Preserve the optional
-    # directory label only if it is present in the GroupKFold input path.
-    input_parent = os.path.dirname(os.path.abspath(args.predictions))
-    parent_name = os.path.basename(input_parent)
-    if parent_name.startswith("selection_"):
-        group_dir = os.path.dirname(input_parent)
-        selection_label = parent_name
-    else:
-        group_dir = input_parent
-        selection_label = None
-    feature_label = os.path.basename(group_dir)
-    if feature_label != safe_target:
-        feature_set = str(pred_df["Feature_set"].iloc[0]) if "Feature_set" in pred_df else None
-        stats = str(pred_df["Stats"].iloc[0]) if "Stats" in pred_df else None
-        allowed = {x for x in (feature_set, stats, f"{feature_set}_{stats}") if x and x != "None"}
-        if feature_label in allowed:
-            parts.append(feature_label)
-    if selection_label:
-        parts.append(selection_label)
-
-    # Different selection analyses on the same predictions must not overwrite
-    # each other when non-default fractions or filters are used.
-    nondefault = (args.top_fractions != [0.20, 0.30, 0.40]
-                  or args.bottom_fractions != [0.20, 0.30, 0.40]
-                  or args.models is not None or args.experiments is not None
-                  or args.group_col != "genotype")
-    if nondefault:
-        settings = {"top": args.top_fractions, "bottom": args.bottom_fractions,
-                    "models": args.models, "experiments": args.experiments,
-                    "group_col": args.group_col}
-        digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()[:10]
-        parts.append("selection_analysis_" + digest)
-    return os.path.join(*parts)
+    # Match the feature-set/statistics naming of the source predictions.
+    feature_set = str(pred_df["Feature_set"].iloc[0]) if "Feature_set" in pred_df else None
+    stats = str(pred_df["Stats"].iloc[0]) if "Stats" in pred_df else None
+    if not feature_set or feature_set == "None" or not stats or stats == "None":
+        raise ValueError("predictions.csv must include Feature_set and Stats metadata.")
+    if "Include_canopy" not in pred_df.columns:
+        raise ValueError("predictions.csv must include Include_canopy metadata.")
+    canopy_values = pred_df["Include_canopy"].dropna().astype(str).str.strip().str.lower().unique()
+    if len(canopy_values) != 1 or canopy_values[0] not in {"true", "false", "1", "0"}:
+        raise ValueError(f"Expected one unambiguous Include_canopy value, got {list(canopy_values)}")
+    canopy = canopy_values[0] in {"true", "1"}
+    for col in ("Feature_set", "Stats", "Target"):
+        if pred_df[col].dropna().astype(str).nunique() != 1:
+            raise ValueError(f"Multiple {col} settings in predictions.csv; use one run at a time.")
+    if "CV_mode" in pred_df.columns:
+        cv_modes = pred_df["CV_mode"].dropna().astype(str).str.lower().unique()
+        if len(cv_modes) != 1 or cv_modes[0] != "hybrid_groupkfold":
+            raise ValueError("Selection efficiency requires genotype-grouped GroupKFold predictions.")
+    return os.path.join(args.output_dir, safe_target,
+                        f"{feature_set}_{stats}" + ("_canopy" if canopy else ""))
 
 
 def main() -> None:
@@ -253,7 +237,7 @@ def main() -> None:
     )
     parser.add_argument("--predictions", required=True,
                         help="Path to predictions.csv from group_kfold_predictions.py")
-    parser.add_argument("--output-dir", default="selection_efficiency_results")
+    parser.add_argument("--output-dir", default="results/selection_efficiency")
     parser.add_argument("--group-col", default="genotype",
                         help="Genotype/group identifier column in predictions.csv.")
     parser.add_argument("--top-fractions", nargs="+", type=float,

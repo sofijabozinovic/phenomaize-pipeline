@@ -229,6 +229,15 @@ def append_prediction_options(
     if args.show_feature_summary:
         command.append("--show-feature-summary")
 
+    if getattr(args, "missing_policy", None):
+        command.extend(["--missing-policy", args.missing_policy])
+    if getattr(args, "impute_max_iter", None) is not None:
+        command.extend(["--impute-max-iter", str(args.impute_max_iter)])
+    if getattr(args, "impute_nearest_features", None) is not None:
+        command.extend(["--impute-nearest-features", str(args.impute_nearest_features)])
+    if getattr(args, "impute_neighbors", None) is not None:
+        command.extend(["--impute-neighbors", str(args.impute_neighbors)])
+
 def build_ml_command(
     input_path: Path,
     target: str,
@@ -587,35 +596,14 @@ def run_preprocess(args: argparse.Namespace) -> None:
 
 
 def organized_output_dir(args: argparse.Namespace, results_dir: Path, module: str) -> Path:
-    """Mirror the output layout used by the standalone analysis scripts."""
+    """Match standalone scripts: <module>/<target>/<feature_set>_<stats>[_canopy]."""
     safe_target = re.sub(r"[^A-Za-z0-9_.-]+", "_", args.target).strip("._")
     if not safe_target:
         raise ValueError("Invalid --target directory name")
-    output = results_dir / module / safe_target
-    labels = []
-    if args.feature_set is not None:
-        labels.append(args.feature_set)
-    if args.stats is not None:
-        labels.append(args.stats)
-    if labels:
-        output /= "_".join(labels)
-
-    extra = {
-        "include_canopy": args.include_canopy,
-        "include_regex": args.include_regex,
-        "exclude_regex": args.exclude_regex,
-        "vegetation_indices": args.vegetation_indices,
-        "stages": args.stages,
-    }
-    if module == "group_kfold" and (
-        args.cv_mode != "random" or args.group_col != "genotype" or args.n_splits != 5
-    ):
-        extra.update(cv_mode=args.cv_mode, group_col=args.group_col,
-                     n_splits=args.n_splits)
-    if any(extra.values()):
-        digest = hashlib.sha256(json.dumps(extra, sort_keys=True).encode("utf-8")).hexdigest()[:10]
-        output /= "selection_" + digest
-    return output
+    feature_set = args.feature_set or "veg_qgis"
+    stats = args.stats or "mean_std"
+    label = f"{feature_set}_{stats}" + ("_canopy" if args.include_canopy else "")
+    return results_dir / module / safe_target / label
 
 
 def group_predictions_path(args: argparse.Namespace, results_dir: Path) -> Path:
@@ -624,28 +612,30 @@ def group_predictions_path(args: argparse.Namespace, results_dir: Path) -> Path:
 
 def selection_output_dir(args: argparse.Namespace, results_dir: Path,
                          predictions_path: Path, target: str) -> Path:
-    """Mirror selection_efficiency.py output naming from the input path."""
-    output = results_dir / "selection_efficiency" / target
-    parent = predictions_path.parent
-    selection_label = None
-    if parent.name.startswith("selection_"):
-        selection_label = parent.name
-        parent = parent.parent
-    # Only explicit feature/stats labels (not the target) appear in input path.
-    if parent.name != target:
-        output /= parent.name
-    if selection_label:
-        output /= selection_label
-    top = args.top_fractions or [0.20, 0.30, 0.40]
-    bottom = args.bottom_fractions or [0.20, 0.30, 0.40]
-    if (top != [0.20, 0.30, 0.40] or bottom != [0.20, 0.30, 0.40]
-            or args.models is not None or args.experiments is not None
-            or args.group_col != "genotype"):
-        settings = {"top": top, "bottom": bottom, "models": args.models,
-                    "experiments": args.experiments, "group_col": args.group_col}
-        digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()[:10]
-        output /= "selection_analysis_" + digest
-    return output
+    """Read the actual GroupKFold metadata, not a guessed parent directory."""
+    import pandas as pd
+    if not predictions_path.is_file():
+        if args.dry_run:
+            label = f"{args.feature_set or 'veg_qgis'}_{args.stats or 'mean_std'}"
+            if args.include_canopy:
+                label += "_canopy"
+            return results_dir / "selection_efficiency" / target / label
+        raise FileNotFoundError(f"Missing predictions: {predictions_path}")
+    df = pd.read_csv(predictions_path, usecols=lambda c: c in
+                     {"Target", "Feature_set", "Stats", "Include_canopy"})
+    for col in ("Target", "Feature_set", "Stats", "Include_canopy"):
+        if col not in df.columns or df[col].dropna().astype(str).nunique() != 1:
+            raise ValueError(f"Predictions must have one unambiguous {col} value")
+    true_val = str(df["Include_canopy"].dropna().iloc[0]).lower()
+    if true_val not in ("true", "false", "1", "0"):
+        raise ValueError(f"Invalid Include_canopy: {true_val}")
+    actual_target = str(df["Target"].iloc[0])
+    if target and target != actual_target:
+        raise ValueError(f"Target mismatch: requested {target}, predictions {actual_target}")
+    label = f"{df['Feature_set'].iloc[0]}_{df['Stats'].iloc[0]}"
+    if true_val in ("true", "1"):
+        label += "_canopy"
+    return results_dir / "selection_efficiency" / actual_target / label
 
 
 def run_ml(args: argparse.Namespace) -> None:
@@ -777,10 +767,12 @@ def run_selection_efficiency(args: argparse.Namespace) -> None:
         if args.target:
             target_label = args.target
         else:
-            ancestor = next((p for p in predictions_path.parents if p.parent.name == "group_kfold"), None)
-            if ancestor is None:
-                raise ValueError("Provide --target when predictions are outside results/group_kfold/<target>/")
-            target_label = ancestor.name
+            import pandas as pd
+            meta = pd.read_csv(predictions_path, usecols=["Target"])
+            vals = meta["Target"].dropna().astype(str).unique()
+            if len(vals) != 1:
+                raise ValueError("Predictions must contain exactly one Target")
+            target_label = vals[0]
     else:
         if not args.target:
             raise ValueError(
@@ -1088,6 +1080,11 @@ def add_prediction_arguments(
         action="store_true",
         help="Include canopy-cover columns.",
     )
+    parser.add_argument("--missing-policy", choices=["fold_mice", "fold_knn", "drop"],
+                        default=None, help="Training-only imputation for prediction models.")
+    parser.add_argument("--impute-max-iter", type=int, default=None)
+    parser.add_argument("--impute-nearest-features", type=int, default=None)
+    parser.add_argument("--impute-neighbors", type=int, default=None)
     parser.add_argument(
         "--include-regex",
         default=None,

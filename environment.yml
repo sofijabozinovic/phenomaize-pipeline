@@ -1,3 +1,8 @@
+# PHENO_MaizE Pipeline — Conda environment
+# Python range and dependency families preserved from the tested environment.yml.
+# Dependency versions are intentionally not fully pinned; a clean CPU installation
+# and analytical workflow have been successfully tested.
+# For an exact reproducibility record, export the resolved Conda and pip versions.
 name: phenomaize
 
 channels:
@@ -7,24 +12,29 @@ channels:
 dependencies:
   - python>=3.11,<3.13
 
+  # Data handling
   - numpy
   - pandas
   - scipy
 
+  # Machine learning
   - scikit-learn
   - xgboost
 
+  # Plotting
   - matplotlib
   - seaborn
 
+  # Geospatial extraction
   - rasterio
   - geopandas
   - shapely
 
   - tqdm
-
   - pip
 
   - pip:
+      # PyTorch installation here is not a guarantee of CUDA-enabled execution.
+      # GPU builds depend on the OS, hardware, drivers, and PyTorch wheels.
       - torch
       - tabulate
