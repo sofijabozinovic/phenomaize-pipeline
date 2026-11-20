@@ -871,7 +871,7 @@ def main():
     # CV args
     parser.add_argument("--cv-mode",
                         choices=["random", "hybrid_groupkfold"],
-                        default="random",
+                        default="hybrid_groupkfold",
                         help="Validation mode: random split or GroupKFold by a grouping column.")
     parser.add_argument(
         "--group-col", "--hybrid-col",
